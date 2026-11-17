@@ -1,0 +1,68 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.flag {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.flagSvg {
+  width: 24px;
+  height: 16px;
+  margin-left: -4px;
+}
+.value {
+  color: inherit;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.value[href]:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tail {
+  display: inline-block;
+  filter: blur(5px);
+  opacity: 0.7;
+  user-select: none;
+  transition:
+    filter 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s;
+}
+.on .tail {
+  filter: blur(0);
+  opacity: 1;
+  user-select: text;
+}
+.eye {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(23, 19, 31, 0.06);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.eye:hover {
+  background: rgba(23, 19, 31, 0.12);
+}
+.eye svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.slash {
+  stroke-width: 2;
+}

@@ -1,0 +1,164 @@
+/* The square and the panel are one ink box that grows out of its corner. */
+.box {
+  --ease: cubic-bezier(0.77, 0, 0.18, 1);
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9100;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #14111b;
+  color: #f2f0ec;
+  box-shadow: 0 12px 34px -14px rgba(20, 17, 27, 0.6);
+  overflow: hidden;
+  transition:
+    width 0.7s var(--ease),
+    height 0.7s var(--ease),
+    border-radius 0.7s var(--ease),
+    background-color 0.4s ease;
+}
+/* over an ink section the closed square turns paper (Menu probes what is under it) */
+.box[data-tone="light"]:not(.open) {
+  background: #f2f0ec;
+  box-shadow: 0 12px 34px -14px rgba(0, 0, 0, 0.7);
+}
+.box[data-tone="light"]:not(.open) .btn span {
+  background: #14111b;
+}
+.open {
+  width: min(310px, calc(100vw - 32px));
+  height: 332px;
+  border-radius: 18px;
+}
+.panel {
+  position: absolute;
+  right: 22px;
+  bottom: 72px;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-family: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  pointer-events: none;
+}
+.open .panel {
+  pointer-events: auto;
+}
+.link {
+  display: block;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+/* each word rises in after the box has opened, and rolls to a tangerine copy on hover */
+.roll {
+  position: relative;
+  display: inline-block;
+  transform: translateY(110%);
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.roll::after {
+  content: attr(data-copy);
+  position: absolute;
+  left: 0;
+  top: 110%;
+  color: #ff5a36;
+}
+.open .roll {
+  transform: translateY(0);
+  transition-delay: calc(0.32s + var(--i) * 0.06s);
+}
+.open .link:hover .roll,
+.open .link:focus-visible .roll {
+  transform: translateY(-110%);
+  transition-delay: 0s;
+}
+.small {
+  display: flex;
+  gap: 14px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.open .small {
+  opacity: 0.6;
+  transition-delay: 0.55s;
+}
+.small a {
+  color: inherit;
+  text-decoration: none;
+}
+.small a:hover {
+  color: #ff5a36;
+}
+.btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-content: center;
+  gap: 7px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.btn span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  border-radius: 2px;
+  background: #f2f0ec;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.4s ease;
+}
+.open .btn span:first-child {
+  transform: translateY(4.5px) rotate(45deg);
+}
+.open .btn span:last-child {
+  transform: translateY(-4.5px) rotate(-45deg);
+}
+.box:not(.open):hover {
+  transform: scale(1.06);
+}
+.box {
+  transform-origin: 100% 100%;
+}
+
+@media (max-width: 768px) {
+  .box {
+    top: 14px;
+    right: 14px;
+    bottom: auto;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+  .open {
+    width: min(290px, calc(100vw - 28px));
+    height: 316px;
+  }
+  .btn {
+    top: 0;
+    bottom: auto;
+    width: 48px;
+    height: 48px;
+  }
+  .panel {
+    top: 64px;
+    bottom: auto;
+    right: 20px;
+  }
+  .link {
+    font-size: 40px;
+  }
+}

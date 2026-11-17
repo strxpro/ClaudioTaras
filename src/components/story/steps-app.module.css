@@ -1,0 +1,458 @@
+/* All sizes in card px (--cu, set on .aboutCard), so the app scales with the phone like the card. */
+.app {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  border-radius: calc(var(--cu) * 20);
+  background: linear-gradient(180deg, #fbfaf8 0%, #f2f0ec 100%);
+  box-shadow: 0 calc(var(--cu) * 3) calc(var(--cu) * 12) rgba(23, 19, 31, 0.2);
+  color: #17131f;
+  font-family: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  /* the card "unlocks" into the app a beat after it lands */
+  clip-path: inset(100% 0 0 0 round calc(var(--cu) * 20));
+  transition: clip-path 0.8s cubic-bezier(0.77, 0, 0.18, 1);
+}
+.on {
+  clip-path: inset(0 0 0 0 round calc(var(--cu) * 20));
+  transition-delay: 0.9s;
+}
+.bars {
+  position: absolute;
+  top: calc(var(--cu) * 14);
+  left: calc(var(--cu) * 16);
+  right: calc(var(--cu) * 16);
+  display: flex;
+  gap: calc(var(--cu) * 5);
+}
+.bar {
+  position: relative;
+  flex: 1;
+  height: calc(var(--cu) * 3.5);
+  overflow: hidden;
+  border-radius: 9px;
+  background: rgba(23, 19, 31, 0.12);
+}
+.bar i {
+  position: absolute;
+  inset: 0;
+  background: #17131f;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+.bar .full {
+  transform: scaleX(1);
+}
+.bar .fill {
+  animation: fillBar 3s linear forwards;
+}
+@keyframes fillBar {
+  to {
+    transform: scaleX(1);
+  }
+}
+.head {
+  position: absolute;
+  top: calc(var(--cu) * 30);
+  left: calc(var(--cu) * 16);
+  right: calc(var(--cu) * 16);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--cu) * 7);
+  margin: 0;
+  font-size: calc(var(--cu) * 13);
+  font-weight: 700;
+}
+.head em {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 500;
+  opacity: 0.5;
+}
+.dot {
+  width: calc(var(--cu) * 8);
+  height: calc(var(--cu) * 8);
+  border-radius: 50%;
+  background: #ff5a36;
+  box-shadow: 0 0 0 calc(var(--cu) * 3) rgba(255, 90, 54, 0.2);
+}
+.scr {
+  position: absolute;
+  inset: calc(var(--cu) * 62) calc(var(--cu) * 16) calc(var(--cu) * 18);
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateX(calc(var(--cu) * 30));
+  transition:
+    opacity 0.4s,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cur {
+  opacity: 1;
+  transform: none;
+}
+
+/* 1 · chat */
+.bubble {
+  max-width: 82%;
+  margin: 0;
+  padding: calc(var(--cu) * 11) calc(var(--cu) * 13);
+  border-radius: calc(var(--cu) * 16);
+  font-size: calc(var(--cu) * 15);
+  line-height: 1.3;
+  opacity: 0;
+  transform: translateY(calc(var(--cu) * 12)) scale(0.96);
+}
+.me {
+  align-self: flex-end;
+  margin-top: calc(var(--cu) * 30);
+  border-bottom-right-radius: calc(var(--cu) * 4);
+  background: #ff5a36;
+  color: #fff;
+}
+.you {
+  align-self: flex-start;
+  border-bottom-left-radius: calc(var(--cu) * 4);
+  background: #fff;
+  box-shadow: 0 calc(var(--cu) * 2) calc(var(--cu) * 10) rgba(23, 19, 31, 0.08);
+}
+.typing {
+  display: flex;
+  gap: calc(var(--cu) * 4);
+  align-self: flex-start;
+  margin: calc(var(--cu) * 14) 0 calc(var(--cu) * 6);
+  padding: calc(var(--cu) * 10) calc(var(--cu) * 12);
+  border-radius: calc(var(--cu) * 14);
+  background: #fff;
+  opacity: 0;
+}
+.typing i {
+  width: calc(var(--cu) * 6);
+  height: calc(var(--cu) * 6);
+  border-radius: 50%;
+  background: rgba(23, 19, 31, 0.45);
+  animation: blink 0.9s infinite;
+}
+.typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+    transform: translateY(calc(var(--cu) * -2));
+  }
+}
+.cur .me {
+  animation: pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+}
+.cur .typing {
+  animation: typingShow 1.1s 0.75s forwards;
+}
+.cur .you {
+  animation: pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1.75s forwards;
+}
+@keyframes pop {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes typingShow {
+  0%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* 2 · plan */
+.ring {
+  position: relative;
+  align-self: center;
+  width: calc(var(--cu) * 118);
+  height: calc(var(--cu) * 118);
+  margin-top: calc(var(--cu) * 8);
+}
+.ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ring circle {
+  fill: none;
+  stroke: rgba(23, 19, 31, 0.1);
+  stroke-width: 8;
+}
+.ring .ringFg {
+  stroke: #ff5a36;
+  stroke-linecap: round;
+  stroke-dasharray: 264;
+  stroke-dashoffset: 264;
+}
+.cur .ringFg {
+  animation: ringFill 2.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards;
+}
+@keyframes ringFill {
+  to {
+    stroke-dashoffset: 18;
+  }
+}
+.ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-gilda), Georgia, serif;
+  font-size: calc(var(--cu) * 34);
+  font-weight: 400;
+}
+.title {
+  margin: calc(var(--cu) * 16) 0 calc(var(--cu) * 8);
+  font-size: calc(var(--cu) * 20);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.checks {
+  display: grid;
+  gap: calc(var(--cu) * 8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(var(--cu) * 14);
+}
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--cu) * 9);
+  opacity: 0;
+  transform: translateX(calc(var(--cu) * -10));
+}
+.checks span {
+  display: grid;
+  place-items: center;
+  width: calc(var(--cu) * 20);
+  height: calc(var(--cu) * 20);
+  border-radius: 50%;
+  background: #17131f;
+  color: #fff;
+  font-size: calc(var(--cu) * 11);
+}
+.cur .checks li {
+  animation: pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(0.7s + var(--i) * 0.45s);
+}
+
+/* 3 · build */
+.site {
+  position: relative;
+  height: calc(var(--cu) * 190);
+  margin-top: calc(var(--cu) * 4);
+  overflow: hidden;
+  border-radius: calc(var(--cu) * 12);
+  background: #fff;
+  box-shadow: 0 calc(var(--cu) * 6) calc(var(--cu) * 20) rgba(23, 19, 31, 0.1);
+}
+.site > span,
+.cards span {
+  position: absolute;
+  border-radius: calc(var(--cu) * 6);
+  opacity: 0;
+  transform: translateY(calc(var(--cu) * 14));
+}
+.nav {
+  inset: calc(var(--cu) * 10) calc(var(--cu) * 10) auto;
+  height: calc(var(--cu) * 12);
+  background: #17131f;
+}
+.heroBlock {
+  inset: calc(var(--cu) * 32) calc(var(--cu) * 10) auto;
+  height: calc(var(--cu) * 64);
+  background: linear-gradient(120deg, #ff5a36, #ff9a6e);
+}
+.line1,
+.line2 {
+  left: calc(var(--cu) * 10);
+  height: calc(var(--cu) * 7);
+  background: rgba(23, 19, 31, 0.14);
+}
+.line1 {
+  top: calc(var(--cu) * 106);
+  width: 70%;
+}
+.line2 {
+  top: calc(var(--cu) * 118);
+  width: 46%;
+}
+.cards {
+  position: absolute;
+  inset: auto calc(var(--cu) * 10) calc(var(--cu) * 10);
+  height: calc(var(--cu) * 46);
+}
+.cards span {
+  top: 0;
+  bottom: 0;
+  width: 31%;
+  background: #dfe5ec;
+}
+.cards span:nth-child(1) {
+  left: 0;
+}
+.cards span:nth-child(2) {
+  left: 34.5%;
+}
+.cards span:nth-child(3) {
+  right: 0;
+}
+.cur .site > span,
+.cur .cards span {
+  animation: pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.cur .nav {
+  animation-delay: 0.1s !important;
+}
+.cur .heroBlock {
+  animation-delay: 0.4s !important;
+}
+.cur .line1 {
+  animation-delay: 0.7s !important;
+}
+.cur .line2 {
+  animation-delay: 0.85s !important;
+}
+.cur .cards span:nth-child(1) {
+  animation-delay: 1.15s;
+}
+.cur .cards span:nth-child(2) {
+  animation-delay: 1.3s;
+}
+.cur .cards span:nth-child(3) {
+  animation-delay: 1.45s;
+}
+.site .cursor {
+  top: 0;
+  left: 0;
+  width: calc(var(--cu) * 12);
+  height: calc(var(--cu) * 12);
+  border-radius: 50% 50% 50% 0;
+  background: #17131f;
+  opacity: 1;
+  transform: translate(calc(var(--cu) * 200), calc(var(--cu) * 170)) rotate(-45deg);
+}
+.cur .cursor {
+  animation: cursorMove 2.6s cubic-bezier(0.65, 0, 0.35, 1) forwards !important;
+}
+@keyframes cursorMove {
+  0% {
+    transform: translate(calc(var(--cu) * 200), calc(var(--cu) * 170)) rotate(-45deg);
+  }
+  45% {
+    transform: translate(calc(var(--cu) * 120), calc(var(--cu) * 60)) rotate(-45deg);
+  }
+  55% {
+    transform: translate(calc(var(--cu) * 120), calc(var(--cu) * 60)) rotate(-45deg) scale(0.8);
+  }
+  100% {
+    transform: translate(calc(var(--cu) * 60), calc(var(--cu) * 150)) rotate(-45deg);
+  }
+}
+.note {
+  margin: 0;
+  font-size: calc(var(--cu) * 14);
+  line-height: 1.35;
+  opacity: 0.65;
+}
+
+/* 4 · live */
+.toggle {
+  position: relative;
+  align-self: center;
+  width: calc(var(--cu) * 92);
+  height: calc(var(--cu) * 50);
+  margin-top: calc(var(--cu) * 14);
+  border-radius: 999px;
+  background: rgba(23, 19, 31, 0.14);
+  transition: background 0.4s 0.5s;
+}
+.toggle span {
+  position: absolute;
+  top: calc(var(--cu) * 5);
+  left: calc(var(--cu) * 5);
+  width: calc(var(--cu) * 40);
+  height: calc(var(--cu) * 40);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 calc(var(--cu) * 3) calc(var(--cu) * 8) rgba(0, 0, 0, 0.18);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s;
+}
+.cur .toggle {
+  background: #2fbf71;
+}
+.cur .toggle span {
+  transform: translateX(calc(var(--cu) * 42));
+}
+.big {
+  margin: calc(var(--cu) * 16) 0 calc(var(--cu) * 4);
+  font-family: var(--font-gilda), Georgia, serif;
+  font-size: calc(var(--cu) * 34);
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+.scr .big + .note {
+  text-align: center;
+}
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--cu) * 6);
+  height: calc(var(--cu) * 70);
+  margin-top: calc(var(--cu) * 16);
+}
+.chart span {
+  flex: 1;
+  height: var(--h);
+  border-radius: calc(var(--cu) * 4) calc(var(--cu) * 4) 0 0;
+  background: #17131f;
+  transform: scaleY(0);
+  transform-origin: 50% 100%;
+}
+.chart span:last-child {
+  background: #ff5a36;
+}
+.cur .chart span {
+  animation: grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(0.8s + var(--i) * 0.08s);
+}
+@keyframes grow {
+  to {
+    transform: scaleY(1);
+  }
+}
+.sub {
+  margin: calc(var(--cu) * 10) 0 0;
+  font-size: calc(var(--cu) * 12);
+  text-align: center;
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app,
+  .scr,
+  .bubble,
+  .checks li,
+  .site > span,
+  .cards span,
+  .chart span {
+    transition: none;
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}

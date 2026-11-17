@@ -1,0 +1,259 @@
+/*
+ * The loader moves only with CSS animations / transitions on transform and opacity (the compositor):
+ * they keep their pace while the page hydrates and builds its 3D underneath. The counter is a CSS
+ * counter animated through a registered integer, so even the digits need no JavaScript.
+ * Phases (data attributes on .root): go (after the first paint) → ready (count to 100) → exit.
+ */
+@property --n {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.root {
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --curtain: cubic-bezier(0.77, 0, 0.18, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  pointer-events: auto;
+}
+.root[data-exit] {
+  pointer-events: none;
+}
+
+/* two curtains, each with a curved hanging edge (a static ellipse under it, so the slide stays a pure translate) */
+.sheet,
+.under {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.sheet::after,
+.under::after {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: calc(100% - 1px);
+  height: 18vh;
+  background: inherit;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+}
+.sheet {
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: #f2f0ec;
+  color: #17131f;
+}
+.under {
+  z-index: 1;
+  background: #14111b;
+}
+.root[data-exit] .sheet {
+  transform: translateY(calc(-100% - 19vh));
+  transition: transform 1.05s var(--curtain) 0.36s;
+}
+.root[data-exit] .under {
+  transform: translateY(calc(-100% - 19vh));
+  transition: transform 1.05s var(--curtain) 0.5s;
+}
+
+.inner {
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 1.4vw, 22px);
+  padding: 0 12px;
+  text-align: center;
+}
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.2em;
+  margin: 0;
+  /* the hero headline's own face (Gilda Display, uppercase): the name is the same before and after the loader */
+  font-family: var(--font-gilda), "Times New Roman", Georgia, serif;
+  font-size: clamp(54px, 10.4vw, 210px);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.wordMask {
+  display: inline-flex;
+  overflow: hidden;
+  padding-bottom: 0.05em;
+}
+.ch {
+  display: inline-block;
+  transform: translateY(108%);
+}
+.root[data-go] .ch {
+  animation: rise 1s var(--ease) calc(0.05s + var(--i) * 0.04s) both;
+}
+@keyframes rise {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.word {
+  margin: 0;
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-size: clamp(32px, 3.8vw, 64px);
+  font-style: italic;
+  line-height: 1;
+  opacity: 0;
+}
+.root[data-go] .word {
+  animation: fadeIn 0.9s var(--ease) 0.6s both;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.foot {
+  position: absolute;
+  left: max(20px, 3vw);
+  right: max(20px, 3vw);
+  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 16px);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  font-family: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  opacity: 0;
+}
+.root[data-go] .foot {
+  animation: fadeIn 0.7s ease 0.3s both;
+}
+.role {
+  font-size: clamp(13px, 1.1vw, 16px);
+  opacity: 0.6;
+}
+/* the counter: digits drawn by a CSS counter, so they run before (and without) any JavaScript */
+.count {
+  counter-reset: n var(--n);
+  font-family: var(--font-archivo), sans-serif;
+  font-size: clamp(40px, 4.6vw, 76px);
+  font-weight: 800;
+  font-stretch: 72%;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.8;
+  letter-spacing: -0.01em;
+}
+.count::before {
+  content: counter(n);
+}
+.count::after {
+  content: "%";
+  margin-left: 0.06em;
+  font-size: 0.42em;
+  vertical-align: top;
+  opacity: 0.55;
+}
+/* a fine line along the bottom, same curve as the counter */
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(23, 19, 31, 0.08);
+}
+.bar {
+  position: absolute;
+  inset: 0;
+  background: #ff5a36;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+/* phase 1: towards 92 (an easing that never looks stuck), phase 2: on to 100 once the page is ready */
+.root[data-go] .count {
+  animation: n1 2.6s cubic-bezier(0.3, 0.55, 0.25, 1) forwards;
+}
+.root[data-go] .bar {
+  animation: b1 2.6s cubic-bezier(0.3, 0.55, 0.25, 1) forwards;
+}
+@keyframes n1 {
+  to {
+    --n: 92;
+  }
+}
+@keyframes b1 {
+  to {
+    transform: scaleX(0.92);
+  }
+}
+.root[data-ready] .count {
+  animation: n2 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.root[data-ready] .bar {
+  animation: b2 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes n2 {
+  to {
+    --n: 100;
+  }
+}
+@keyframes b2 {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* exit: the letters leave through their masks, the rest fades, then the curtains go */
+.root[data-exit] .ch {
+  animation: leave 0.62s cubic-bezier(0.6, 0, 0.3, 1) calc(var(--i) * 0.016s) both;
+}
+@keyframes leave {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-108%);
+  }
+}
+.root[data-exit] .word,
+.root[data-exit] .foot,
+.root[data-exit] .track {
+  animation: fadeOut 0.4s ease both;
+}
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@media (max-width: 768px) {
+  .name {
+    flex-direction: column;
+    align-items: center;
+    font-size: clamp(60px, 18.5vw, 130px);
+  }
+  .word {
+    font-size: clamp(32px, 9vw, 48px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    display: none;
+  }
+}

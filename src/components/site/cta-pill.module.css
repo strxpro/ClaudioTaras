@@ -1,0 +1,33 @@
+/* the home page's design tokens, for the pill and the WhatsApp composer on the other pages */
+.vars {
+  --serif: var(--font-gilda), "Times New Roman", Georgia, serif;
+  --sans: var(--font-inter), -apple-system, "SF Pro Display", system-ui, sans-serif;
+  --text: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  --fog: #dde4ec;
+  --fog-hi: #f3f6f9;
+  --accent: #ff5a36;
+  --accent-soft: #ffe3d8;
+  --slate: #1c2633;
+  --paper: #fbfaf8;
+  --bg: #f2f0ec;
+  --ink: #17131f;
+  --muted: rgba(23, 19, 31, 0.6);
+  --gut: 40px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: var(--sans);
+  color: var(--ink);
+}
+@media (max-width: 768px) {
+  .vars {
+    --gut: 16px;
+  }
+}
+/* while typing on a phone the floating bars step aside (see KeyboardSafe) */
+:global(html.kb) .vars > :first-child {
+  opacity: 0;
+  pointer-events: none;
+}
+:global(html.sheet-open) .vars > :first-child {
+  opacity: 0;
+  pointer-events: none;
+}

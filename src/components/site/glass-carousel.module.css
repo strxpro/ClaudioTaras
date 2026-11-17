@@ -1,0 +1,306 @@
+/* The works stage: one screen, ink background, the WebGL strip in the middle, words around it.
+   --cw / --ch / --cy (card size and the strip's offset from the centre, + = up) come from the script. */
+.root {
+  --ink: #14111b;
+  --paper: #f2f0ec;
+  --accent: #ff5a36;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cw: 34vw;
+  --ch: 21vw;
+  --cy: 0px;
+  position: relative;
+  height: 100svh;
+  min-height: 560px;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- the head: title + filters */
+.head {
+  position: absolute;
+  z-index: 3;
+  top: 96px;
+  left: var(--gutter, 40px);
+  right: var(--gutter, 40px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px 24px;
+  pointer-events: none;
+}
+.head > * {
+  pointer-events: auto;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-gilda), "Times New Roman", Georgia, serif;
+  font-size: clamp(26px, 2.6vw, 40px);
+  font-weight: 400;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+.title sup {
+  font-family: var(--font-inter-tight), system-ui, sans-serif;
+  font-size: 0.4em;
+  opacity: 0.55;
+  vertical-align: super;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.filters button {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(242, 240, 236, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: 500 13px/1 var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  cursor: pointer;
+  transition:
+    background 0.3s,
+    color 0.3s,
+    border-color 0.3s;
+}
+.filters button:hover {
+  border-color: rgba(242, 240, 236, 0.5);
+}
+.filters .on {
+  background: var(--paper);
+  border-color: var(--paper);
+  color: var(--ink);
+}
+
+/* ---- the centred project's name, above the strip */
+.info {
+  position: absolute;
+  z-index: 2;
+  left: var(--gutter, 40px);
+  right: var(--gutter, 40px);
+  bottom: calc(50% + var(--cy) + var(--ch) / 2 + 26px);
+  text-align: center;
+  pointer-events: none;
+}
+.kicker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  animation: fadeUp 0.6s var(--ease) both;
+}
+.wip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff8a6a;
+  opacity: 1;
+}
+.wip i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 90, 54, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 90, 54, 0);
+  }
+}
+.nameMask {
+  margin: 0;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+.name {
+  display: inline-block;
+  font-family: var(--font-archivo), "Arial Narrow", sans-serif;
+  font-size: clamp(34px, 5.2vw, 92px);
+  font-weight: 800;
+  font-stretch: 72%;
+  line-height: 0.9;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  animation: nameUp 0.7s var(--ease) both;
+}
+@keyframes nameUp {
+  from {
+    transform: translateY(105%);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---- counter + hint, under the strip */
+.foot {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--cy) + var(--ch) / 2 + 28px);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.count {
+  margin: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+.count b {
+  font-weight: 700;
+  opacity: 1;
+  color: var(--paper);
+}
+.hint {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.4;
+}
+
+/* ---- invisible zones for the cursor: previous | open | next */
+.zoneL,
+.zoneC,
+.zoneR {
+  position: absolute;
+  z-index: 1;
+  top: calc(50% - var(--cy) - var(--ch) / 2 - 40px);
+  height: calc(var(--ch) + 80px);
+}
+.zoneL {
+  left: 0;
+  width: calc(50% - var(--cw) / 2);
+}
+.zoneR {
+  right: 0;
+  width: calc(50% - var(--cw) / 2);
+}
+.zoneC {
+  left: calc(50% - var(--cw) / 2);
+  width: var(--cw);
+  top: calc(50% - var(--cy) - var(--ch) / 2);
+  height: var(--ch);
+}
+
+/* ---- without WebGL2: a plain swipeable row */
+.fallback {
+  position: absolute;
+  inset: 180px 0 120px;
+  display: flex;
+  gap: 16px;
+  padding: 0 var(--gutter, 40px);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
+}
+.fbCard {
+  flex: none;
+  width: min(70vw, 560px);
+  scroll-snap-align: center;
+  color: inherit;
+  text-decoration: none;
+}
+.fbCard img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 14px;
+  background: var(--a, #222);
+}
+.fbCard span {
+  display: block;
+  margin-top: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+  .head {
+    top: 74px;
+    left: 16px;
+    right: 16px;
+  }
+  /* phones: the header already says where you are; the filters stay */
+  .title {
+    display: none;
+  }
+  .filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+  .filters::-webkit-scrollbar {
+    display: none;
+  }
+  .filters button {
+    flex: none;
+    height: 32px;
+    font-size: 12px;
+  }
+  .info {
+    left: 16px;
+    right: 16px;
+    top: 120px;
+    bottom: auto;
+  }
+  .kicker {
+    margin-bottom: 8px;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+  }
+  .name {
+    font-size: clamp(26px, 8.2vw, 38px);
+  }
+  .foot {
+    top: calc(50% - var(--cy) + var(--ch) / 2 + 16px);
+  }
+  .hint {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .name,
+  .kicker {
+    animation: none;
+  }
+}

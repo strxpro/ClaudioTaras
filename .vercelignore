@@ -1,0 +1,9 @@
+.capture
+.data
+.env*
+!.env.example
+node_modules
+.next
+promo
+*.blend
+*.log
