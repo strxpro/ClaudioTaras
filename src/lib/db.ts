@@ -5,6 +5,8 @@
  * Every read/write in the app goes through `db`, so switching backends needs no other change.
  */
 import fs from "node:fs/promises";
+import https from "node:https";
+import { revalidatePath, revalidateTag } from "next/cache";
 import path from "node:path";
 import type { Database, Message, PageView, Project, Settings } from "./types";
 import { seedDatabase } from "./seed";
@@ -69,20 +71,54 @@ async function mutate(fn: (d: Database) => void) {
 
 /* ---------------------------------- supabase ---------------------------------- */
 
+// The public pages are static (built once, served ready-made from the CDN, refreshed hourly). Supabase is
+// called over plain https rather than fetch(): Next treats any uncached fetch as "render on every visit",
+// which made each page wait ~1 s for the database. Every write to projects/settings re-renders the pages,
+// so a change made in the admin or by the bot is live at once; the admin itself always reads fresh rows.
+const PUBLIC_TABLES = /^(projects|settings)/;
+function contentChanged() {
+  try {
+    revalidateTag("db", { expire: 0 });
+  } catch {}
+  try {
+    revalidatePath("/", "layout");
+  } catch {}
+}
+
 async function sb<T>(pathname: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathname}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      ...supabaseAuth(),
-      "Content-Type": "application/json",
-      Prefer: "return=representation,resolution=merge-duplicates",
-      ...init.headers,
-    },
+  const read = !init.method || init.method === "GET";
+  const content = PUBLIC_TABLES.test(pathname);
+  const out = await sbFetch<T>(pathname, init);
+  if (!read && content) contentChanged();
+  return out;
+}
+
+function request(url: string, method: string, headers: Record<string, string>, body?: BodyInit | null) {
+  return new Promise<{ status: number; text: string }>((resolve, reject) => {
+    if (typeof body === "string") headers["Content-Length"] = String(Buffer.byteLength(body));
+    const req = https.request(url, { method, headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, text: Buffer.concat(chunks).toString("utf8") }));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, () => req.destroy(new Error("Supabase: timeout")));
+    if (typeof body === "string") req.write(body);
+    req.end();
   });
-  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
-  const text = await res.text();
-  return (text ? JSON.parse(text) : null) as T;
+}
+
+async function sbFetch<T>(pathname: string, init: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    ...supabaseAuth(),
+    "Content-Type": "application/json",
+    Prefer: "return=representation,resolution=merge-duplicates",
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  const res = await request(`${SUPABASE_URL}/rest/v1/${pathname}`, init.method ?? "GET", headers, init.body);
+  if (res.status < 200 || res.status >= 300) throw new Error(`Supabase ${res.status}: ${res.text}`);
+  return (res.text ? JSON.parse(res.text) : null) as T;
 }
 
 type Row<T> = { id: string; data: T };

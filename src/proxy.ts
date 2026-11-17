@@ -20,15 +20,13 @@ export function proxy(request: NextRequest) {
     return res;
   };
 
-  if (isLocale(first)) {
-    const res = NextResponse.next();
-    res.cookies.set("ct_locale", first, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
-    return remember(res);
-  }
+  if (isLocale(first)) return remember(NextResponse.next());
 
-  const saved = request.cookies.get("ct_locale")?.value;
-  // 1) the visitor's own earlier choice, 2) geolocation from the hosting edge, 3) browser language
-  const locale = isLocale(saved) ? saved : (localeFromCountry(country) ?? pickLocale(request.headers.get("accept-language")));
+  // 1) a language the visitor picked by hand earlier, 2) the device's language (browser / phone settings),
+  // 3) the country from the hosting edge (geolocation), 4) English
+  const saved = request.cookies.get("ct_lang")?.value;
+  const device = pickLocale(request.headers.get("accept-language"), null);
+  const locale = isLocale(saved) ? saved : (device ?? localeFromCountry(country) ?? "en");
   const url = request.nextUrl.clone();
   url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
   return remember(NextResponse.redirect(url));

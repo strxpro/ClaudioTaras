@@ -1354,13 +1354,7 @@ export function Story({ dict, locale, projects, featured, socials, years, age, p
         </div>
         <div className={s.fBottom}>
           <span>{dict.footer.made}</span>
-          <div className={s.fLangs}>
-            {locales.map((l) => (
-              <LangLink key={l} locale={l} current={locale}>
-                {l}
-              </LangLink>
-            ))}
-          </div>
+          <span aria-hidden />
           <span style={{ justifySelf: "end", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
             {ig ? (
               <a href={ig.url} target="_blank" rel="noreferrer">

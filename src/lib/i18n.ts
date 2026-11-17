@@ -23,8 +23,10 @@ export function t(value: L10n | undefined, locale: Locale): string {
   return value[locale] || value.en || value.pl || Object.values(value).find(Boolean) || "";
 }
 
-export function pickLocale(acceptLanguage: string | null): Locale {
-  if (!acceptLanguage) return defaultLocale;
+export function pickLocale(acceptLanguage: string | null): Locale;
+export function pickLocale<F>(acceptLanguage: string | null, fallback: F): Locale | F;
+export function pickLocale(acceptLanguage: string | null, fallback: unknown = defaultLocale) {
+  if (!acceptLanguage) return fallback;
   const ranked = acceptLanguage
     .split(",")
     .map((part) => {
@@ -32,7 +34,7 @@ export function pickLocale(acceptLanguage: string | null): Locale {
       return { tag: tag.toLowerCase().slice(0, 2), q: q ? Number(q) : 1 };
     })
     .sort((a, b) => b.q - a.q);
-  return ranked.find((r) => isLocale(r.tag))?.tag as Locale | undefined ?? defaultLocale;
+  return (ranked.find((r) => isLocale(r.tag))?.tag as Locale | undefined) ?? fallback;
 }
 
 /** Country (ISO-3166 alpha-2, from the hosting edge: Vercel / Cloudflare) → site language. */

@@ -34,6 +34,8 @@ export function useSwitchLocale() {
   const router = useRouter();
   const pathname = usePathname();
   return (l: Locale) => {
+    // chosen by hand: from now on the site opens in this language (instead of the device's)
+    document.cookie = `ct_lang=${l}; path=/; max-age=31536000; samesite=lax`;
     // the home page swaps its words in place (StoryHost): no navigation, nothing reloads
     if (/^\/[a-z]{2}\/?$/.test(location.pathname) && window.__storySwap) return window.__storySwap(l);
     const href = swapLocale(pathname, l) + location.hash;

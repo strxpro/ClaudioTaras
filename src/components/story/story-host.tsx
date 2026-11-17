@@ -56,7 +56,7 @@ export function StoryHost({ initial }: { initial: StoryProps }) {
         document.documentElement.lang = l;
         document.title = next.dict.meta.title;
         history.replaceState(history.state, "", `/${l}${location.search}${location.hash}`);
-        document.cookie = `ct_locale=${l}; path=/; max-age=31536000; samesite=lax`;
+        document.cookie = `ct_lang=${l}; path=/; max-age=31536000; samesite=lax`; // chosen by hand: wins over the device language
         dispatchEvent(new CustomEvent("locale:changed", { detail: l }));
       } catch {
         location.href = `/${l}`;
