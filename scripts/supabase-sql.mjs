@@ -6,6 +6,12 @@ import fs from "node:fs";
 
 const db = JSON.parse(fs.readFileSync(new URL("../.data/db.json", import.meta.url), "utf8"));
 const schema = fs.readFileSync(new URL("../supabase/schema.sql", import.meta.url), "utf8");
+// later additions (statistics table, realtime…): all safe to run twice
+const migDir = new URL("../supabase/migrations/", import.meta.url);
+const migrations = fs.existsSync(migDir)
+  ? fs.readdirSync(migDir).filter((n) => n.endsWith(".sql")).sort().map((n) => `-- ---- ${n}
+` + fs.readFileSync(new URL(n, migDir), "utf8").trim())
+  : [];
 const out = new URL("../supabase/pelna-instalacja.sql", import.meta.url);
 
 // dollar-quoted JSON: no escaping needed as long as the tag never occurs in the data
@@ -36,6 +42,7 @@ lines.push(`-- =================================================================
 -- ================================================================================================
 `);
 lines.push(schema.trim(), "");
+for (const m of migrations) lines.push(m, "");
 lines.push("-- ------------------------------------------------------------------------------- dane: projekty");
 db.projects.forEach((p, i) => {
   lines.push(
