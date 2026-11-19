@@ -14,11 +14,13 @@ function list(dir: string, ext: RegExp) {
   }
 }
 
-// cache-busting version from the file's mtime, so re-captured media always refreshes
+// cache-busting version from the file's size, so re-captured media refreshes. Not the mtime: on Vercel the
+// files carry one date at build time and another in the functions, so every page re-render after a content
+// edit gave every picture a new URL (all images flashed, re-optimised and downloaded again).
 function versioned(dir: string, rel: string, f: string) {
   let v = 0;
   try {
-    v = Math.round(fs.statSync(path.join(dir, f)).mtimeMs / 1000);
+    v = fs.statSync(path.join(dir, f)).size;
   } catch {}
   return `/media/projects/${rel}/${f}?v=${v.toString(36)}`;
 }
