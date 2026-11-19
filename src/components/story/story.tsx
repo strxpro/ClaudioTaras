@@ -840,7 +840,7 @@ export function Story({ dict, locale, projects, featured, socials, years, age, p
       {/* ============================================================ fixed layers */}
       <div className={s.atmos} aria-hidden />
       <Ink progress={progress} className={s.inkCanvas} />
-      <div className={s.clock} aria-hidden>
+      <div className={s.clock} aria-hidden data-live-ignore>
         <div className={s.clockNum}>
           {[0, 1, 2].map((g) => (
             <span key={g} className={s.clockGroup}>
@@ -874,7 +874,7 @@ export function Story({ dict, locale, projects, featured, socials, years, age, p
             <div className={s.phoneActions}>
               <span className={s.roundBtn}>✕</span>
               <span className={s.timerPill}>
-                <span ref={timerText}>23:59:59</span>
+                <span ref={timerText} data-live-ignore>23:59:59</span>
               </span>
               <span className={`${s.roundBtn} ${s.roundBtnOn}`}>✓</span>
             </div>
@@ -1028,7 +1028,7 @@ export function Story({ dict, locale, projects, featured, socials, years, age, p
           </p>
           <p className={s.hfTime}>
             <span className={s.hfDot} />
-            Sardinia · {dict.hero.localTime} <b ref={localTime}>--:--</b>
+            Sardinia · {dict.hero.localTime} <b ref={localTime} data-live-ignore>--:--</b>
           </p>
           <span className={s.hfScroll} aria-hidden>
             {dict.hero.scroll}

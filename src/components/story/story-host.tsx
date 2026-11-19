@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import type { StoryProps } from "@/lib/story-props";
 import { Story } from "./story";
+import type { LiveJob } from "@/components/site/live-updates";
 
 const TEXT = "h1,h2,h3,p,li,dt,dd,a,button,[data-intro]";
 
@@ -35,6 +36,8 @@ declare global {
  */
 export function StoryHost({ initial }: { initial: StoryProps }) {
   const [props, setProps] = useState(initial);
+  const shown = useRef(initial);
+  shown.current = props;
   const cache = useRef(new Map<string, Promise<StoryProps>>([[initial.locale, Promise.resolve(initial)]]));
 
   useEffect(() => {
@@ -72,11 +75,30 @@ export function StoryHost({ initial }: { initial: StoryProps }) {
       });
     };
     const prefetch = (e: Event) => void get((e as CustomEvent<string>).detail).catch(() => {});
+    // content edited in the admin / by the bot (site/live-updates.tsx): re-read this language in place,
+    // forget the others (they are fetched again on the next switch)
+    const live = (e: Event) => {
+      const job = (e as CustomEvent<LiveJob>).detail;
+      const l = document.documentElement.lang;
+      cache.current.clear();
+      const p = fetch(`/api/story?locale=${l}`, { cache: "no-store" })
+        .then((r) => (r.ok ? (r.json() as Promise<StoryProps>) : Promise.reject(r.status)))
+        .then((next) => {
+          cache.current.set(l, Promise.resolve(next));
+          if (busy || document.documentElement.lang !== l) return;
+          if (JSON.stringify(shown.current) === JSON.stringify(next)) return;
+          job?.changed();
+          setProps(next);
+        });
+      job?.wait(p);
+    };
+    addEventListener("content:changed", live);
     window.__storySwap = (l) => void swap(l);
     addEventListener("locale:prefetch", prefetch);
     return () => {
       delete window.__storySwap;
       removeEventListener("locale:prefetch", prefetch);
+      removeEventListener("content:changed", live);
     };
   }, []);
 

@@ -90,11 +90,13 @@ Lokalnie strona działa bez bazy (plik `.data/db.json`). Na Vercelu pliki nie s�
    2. nowe zapytanie: wklej `supabase/migrations/20261106_analytics_realtime.sql` → **Run** (statystyki odwiedzin).
 3. **Project Settings → API Keys**:
    - **Project URL** (`https://xxxx.supabase.co`) → `SUPABASE_URL`;
-   - zakładka **Legacy API keys** → klucz **service_role** (sekretny, zaczyna się od `eyJ`) → `SUPABASE_SERVICE_ROLE_KEY`.
+   - zakładka **Legacy API keys** → klucz **service_role** (sekretny, zaczyna się od `eyJ`) → `SUPABASE_SERVICE_ROLE_KEY` (albo nowy klucz `sb_secret_…`);
+   - klucz **publishable** (`sb_publishable_…`) → `SUPABASE_PUBLISHABLE_KEY`: dzięki niemu otwarte strony same pokazują (z animacją) zmiany zrobione w panelu albo przez bota. Jest publiczny z założenia — tabele są dla niego zamknięte, może tylko nasłuchiwać.
 
    ```
    SUPABASE_URL=https://xxxx.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    ```
    Klucza service_role nie wklejaj nigdzie poza `.env.local` i Vercelem: daje pełny dostęp do bazy.
 4. Restart, potem przenieś obecne projekty, wiadomości i ustawienia (można powtarzać, niczego nie kasuje):
@@ -171,6 +173,7 @@ Dopóki domena nie jest zweryfikowana, Resend wysyła tylko na adres, którym za
 | `ADMIN_TELEGRAM_ID` | bot po `/start` | ✓ | ✓ |
 | `SUPABASE_URL` | Supabase → API Keys | opcjonalnie | ✓ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Legacy API keys | opcjonalnie | ✓ |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase → API Keys (zmiany na żywo) | opcjonalnie | ✓ |
 | `RESEND_API_KEY` | resend.com | opcjonalnie | ✓ |
 | `NOTIFY_EMAIL` | Twoja skrzynka | opcjonalnie | ✓ |
 | `NOTIFY_FROM` | nadawca z Twojej domeny | opcjonalnie | ✓ |

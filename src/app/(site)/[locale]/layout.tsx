@@ -19,6 +19,15 @@ import { SiteMenu } from "@/components/site/menu";
 import { ScrollFX } from "@/components/motion/scroll-fx";
 import { CtaPill } from "@/components/site/cta-pill";
 import { KeyboardSafe } from "@/components/site/keyboard-safe";
+import { LiveUpdates } from "@/components/site/live-updates";
+
+// Live channel for open pages (site/live-updates.tsx). The publishable key is public by design: row level
+// security keeps every table closed to it, it can only listen for the "content changed" signal.
+const liveSocket = (() => {
+  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return url && key ? `${url.replace(/^http/, "ws")}/realtime/v1/websocket?apikey=${encodeURIComponent(key)}&vsn=1.0.0` : null;
+})();
 
 
 export function generateStaticParams() {
@@ -98,6 +107,7 @@ export default async function SiteLayout({ children, params }: { children: React
           <LangAnimator />
           <Scrollbar />
           <Tracker />
+          {liveSocket && <LiveUpdates socket={liveSocket} />}
         </SmoothScroll>
       </body>
     </html>

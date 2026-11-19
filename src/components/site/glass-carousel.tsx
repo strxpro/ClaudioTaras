@@ -153,6 +153,11 @@ async function layerBitmap(url: string, w: number, h: number): Promise<ImageBitm
  */
 export function GlassCarousel({ locale, items: all, labels }: { locale: string; items: WorkItem[]; labels: Labels }) {
   const items = useMemo(() => all.slice(0, MAX), [all]);
+  // the WebGL scene is rebuilt only when something it draws changes: a live text edit
+  // (site/live-updates.tsx) brings a new list but must not blank the canvas
+  const sceneKey = items.map((i) => [i.slug, i.cover, i.mobile, i.accent, i.category].join("|")).join(" ");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scene = useMemo(() => items, [sceneKey]);
   const router = useRouter();
   const root = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -173,7 +178,7 @@ export function GlassCarousel({ locale, items: all, labels }: { locale: string; 
     }
     const phone = matchMedia("(max-width: 768px)").matches;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const N = items.length;
+    const N = scene.length;
 
     // ---- program (compiled on the driver's thread where possible; drawn once ready)
     const par = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
@@ -224,16 +229,16 @@ export function GlassCarousel({ locale, items: all, labels }: { locale: string; 
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     const meta = new Float32Array(MAX * 4);
     const dimA = new Float32Array(MAX);
-    items.forEach((it, k) => meta.set([...hex(it.accent), 0], k * 4));
+    scene.forEach((it, k) => meta.set([...hex(it.accent), 0], k * 4));
     let alive = true;
     let loaded = 0;
-    const order = items.map((_, k) => k);
+    const order = scene.map((_, k) => k);
     (async () => {
       const queue = [...order];
       const worker = async () => {
         while (alive && queue.length) {
           const k = queue.shift()!;
-          const it = items[k];
+          const it = scene[k];
           const url = phone ? it.mobile || it.cover : it.cover;
           if (!url) continue;
           try {
@@ -368,9 +373,9 @@ export function GlassCarousel({ locale, items: all, labels }: { locale: string; 
     api.current = {
       go,
       dim: (c) => {
-        items.forEach((it, k) => (dimA[k] = c && it.category !== c ? 1 : 0));
+        scene.forEach((it, k) => (dimA[k] = c && it.category !== c ? 1 : 0));
         if (c) {
-          const first = items.findIndex((it) => it.category === c);
+          const first = scene.findIndex((it) => it.category === c);
           if (first >= 0) go(first);
         }
         wake();
@@ -455,7 +460,7 @@ export function GlassCarousel({ locale, items: all, labels }: { locale: string; 
       else if (e.key === "Enter" && document.activeElement === host) open(Math.round(tgt));
     };
     const open = (i: number) => {
-      const it = items[i];
+      const it = scene[i];
       if (!it) return;
       sfx("whoosh");
       const r = host.getBoundingClientRect();
@@ -497,7 +502,7 @@ export function GlassCarousel({ locale, items: all, labels }: { locale: string; 
       cv.removeEventListener("webglcontextlost", onLost);
       api.current = null;
     };
-  }, [items, locale, router]);
+  }, [scene, locale, router]);
 
   const pick = (c: string | null) => {
     setCat(c);

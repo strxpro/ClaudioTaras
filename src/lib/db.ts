@@ -85,11 +85,29 @@ function contentChanged() {
   } catch {}
 }
 
+/** Topic of the live channel: open pages (site/live-updates.tsx) refresh themselves when it fires. */
+export const LIVE_TOPIC = "site";
+
+/**
+ * Tells every open page that the content changed (Supabase Realtime broadcast, sent with the secret
+ * key; visitors only listen with the publishable one). Never throws: a missed signal only means the
+ * page shows the change on its next visit.
+ */
+async function announce() {
+  try {
+    const body = JSON.stringify({ messages: [{ topic: LIVE_TOPIC, event: "changed", payload: { at: Date.now() } }] });
+    await request(`${SUPABASE_URL}/realtime/v1/api/broadcast`, "POST", { ...supabaseAuth(), "Content-Type": "application/json" }, body);
+  } catch {}
+}
+
 async function sb<T>(pathname: string, init: RequestInit = {}): Promise<T> {
   const read = !init.method || init.method === "GET";
   const content = PUBLIC_TABLES.test(pathname);
   const out = await sbFetch<T>(pathname, init);
-  if (!read && content) contentChanged();
+  if (!read && content) {
+    contentChanged();
+    await announce();
+  }
   return out;
 }
 
