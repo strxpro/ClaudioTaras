@@ -7,6 +7,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { accentFromShot } from "./accent.mjs";
 import { analyze } from "./analyze.mjs";
 import { deployFolder } from "./deploy.mjs";
 import { inspectFolder, startFolder } from "./source.mjs";
@@ -133,6 +134,14 @@ try {
   step("video", "running");
   const c1 = await run(process.execPath, [path.join("scripts", "capture2.mjs"), slug, url], "nagranie");
   step("video", c1 === 0 ? "done" : "error", c1 === 0 ? undefined : "część nagrań się nie udała — szczegóły w logu");
+
+  // no real colour among the page's buttons/links → the strongest colour of the first screen
+  if (!facts.accent) {
+    const first = path.join(ROOT, "public", "media", "projects", slug, "shots", "d01.webp");
+    facts.accent = (fs.existsSync(first) && (await accentFromShot(first).catch(() => null))) || "#2B2DF5";
+    job.facts = { ...job.facts, accent: facts.accent };
+    log(`Kolor projektu z pierwszego zrzutu: ${facts.accent}`);
+  }
 
   // ---- 4. logo, sub-pages, mobile menu
   step("extras", "running");

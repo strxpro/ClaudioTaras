@@ -169,7 +169,8 @@ if (!has("no-pages")) {
   }, MAX);
   console.log(`[${slug}] sub-pages: ${links.length}`, links);
   // drop previous sub-page shots
-  for (const f of fs.readdirSync(SHOTS)) if (/^s\d+\.webp$/.test(f)) fs.rmSync(path.join(SHOTS, f));
+  // sub-page shots are s01a.webp (top) + s01b.webp (further down); files only, never shots/<locale>/
+  for (const f of fs.readdirSync(SHOTS)) if (/^s\d+[a-z]?\.webp$/.test(f)) fs.rmSync(path.join(SHOTS, f));
   let n = 0;
   for (const link of links) {
     n++;

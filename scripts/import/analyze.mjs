@@ -3,6 +3,7 @@
 // location and year. No AI here — the facts feed scripts/import/write.mjs.
 import { chromium } from "playwright";
 import { unlock } from "../lib/gate.mjs";
+import { usableAccent } from "./accent.mjs";
 
 const DECLINE = /^(rifiuta|reject|decline|solo (necessari|essenziali|tecnici)|only (necessary|essential)|essenziali|odrzuć|refuser|rechazar|nega)/i;
 
@@ -215,7 +216,8 @@ export async function analyze(url, { local = false } = {}) {
     text: raw.text.slice(0, 3500),
     location: raw.locality || guessLocation(`${raw.title}. ${raw.description}`),
     businessType: raw.ldType,
-    accent: /^#[0-9a-f]{6}$/i.test(raw.accent) ? raw.accent : "#2B2DF5",
+    // a cream theme-color or a grey is no accent: run.mjs then takes the colour from the first screenshot
+    accent: usableAccent(raw.accent) ? raw.accent : "",
     year: raw.year || new Date().getFullYear(),
     languages: raw.languages,
     features: [...features],
