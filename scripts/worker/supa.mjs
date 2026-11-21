@@ -30,6 +30,16 @@ export const kv = {
   list: (prefix) => rest(`kv?select=id,data&id=like.${encodeURIComponent(prefix)}*`),
 };
 
+/** One line in today's log (kv "day:<Italian date>"), read by the evening report — src/lib/assistant/journal.ts. */
+export async function journal(kind, text) {
+  try {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const list = (await kv.get(`day:${day}`)) ?? [];
+    list.push({ at: new Date().toISOString(), kind, text: String(text).slice(0, 300) });
+    await kv.set(`day:${day}`, list.slice(-80));
+  } catch {}
+}
+
 export const projects = {
   async all() {
     return (await rest("projects?select=id,data")).map((r) => r.data).sort((a, b) => a.order - b.order);

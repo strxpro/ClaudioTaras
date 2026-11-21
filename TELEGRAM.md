@@ -71,6 +71,35 @@ Gdy komputer jest wyłączony, bot przyjmie zlecenie i powie, że zacznie po wł
 
 Bezpieczniki: pomocnik nie wypycha nic poza folderem zdjęć danego projektu. Gdy na komputerze leżą inne niewysłane zmiany kodu albo GitHub ma nowsze zmiany, zostawia zdjęcia w commicie na komputerze i pisze, co zrobić. Nowy projekt, którego zdjęć jeszcze nie ma na stronie, zapisuje jako szkic.
 
+## 6. Osobisty asystent: przypomnienia, kalendarz, raport dnia
+Bot jest też Twoim asystentem. Przypomnienia, terminy i notatki zapisuje **od razu** (bez ✅). W odpowiedzi jest 🗑 Usuń, a po usunięciu ↩️ Przywróć.
+
+- **Przypomnienia**: „Przypomnij mi jutro o 10 zadzwonić do Marco”, „za 20 minut wyjąć pizzę”, „codziennie o 9 sprawdzić maile”.
+  - O czasie przychodzi wiadomość z przyciskami **✅ Zrobione**, **⏰ 10 min**, **⏰ 1 godz.** i **📅 Jutro**.
+- **Kalendarz**: „W czwartek o 15 spotkanie z klientem w Olbii”, „w piątek urodziny mamy”.
+  - Przy spotkaniu napiszę 1 godz. i 15 min wcześniej, a gdy podasz miejsce, dołożę 🗺 Mapę. Możesz to zmienić: „przypomnij dzień wcześniej”.
+  - „Co mam jutro?”, „przesuń spotkanie na 16”, „odwołaj dentystę”.
+- **Kalendarz w telefonie**:
+  - Przy każdym terminie są przyciski **📅 Google Kalendarz** (dodaje jednym kliknięciem) i **🍏 iPhone / Outlook** (plik .ics).
+  - `/kalendarz` daje adres całego kalendarza: dodasz go raz w telefonie i nowe terminy pojawią się same. Na iPhonie odświeża się szybko, Google robi to co kilka godzin.
+- **Notatki**: „Zanotuj: skończyłem layout hotelu” trafia do wieczornego raportu. Do raportu trafia też to, co zmieniłeś przez bota, nowe zapytania i nagrania pomocnika.
+- **Raport dnia** (codziennie o 20:00) zawiera:
+  - ile osób było na stronie (z porównaniem do wczoraj i do średniej z 7 dni), skąd przyszły, z jakich urządzeń, które projekty oglądały i czy weszły w kontakt;
+  - zapytania bez odpowiedzi i to, co dziś zrobiłeś;
+  - jutrzejszy kalendarz;
+  - 3 rzeczy do poprawy, plan na jutro, pomysł na ambitny system (przycisk 💡 daje kolejny) i zdanie motywacji.
+
+  Godzinę zmienisz, mówiąc „raport o 21”, a wyłączysz go słowami „wyłącz raport”. `/raport` daje raport od razu.
+- **Plan na dzień** (o 8:00) przychodzi tylko wtedy, gdy coś jest w kalendarzu albo czeka zapytanie.
+
+**Zegar asystenta.** Wiadomości wysyła strona (`/api/cron/tick`). Budzi ją kilka „zegarów”, a każda wiadomość wychodzi tylko raz:
+- pomocnik na komputerze co minutę (dokładnie co do minuty);
+- GitHub Actions co ~5 min, gdy komputer jest wyłączony (`.github/workflows/assistant-clock.yml`);
+- Vercel raz dziennie (dla pewności);
+- każda Twoja wiadomość do bota.
+
+`/stats` pokazuje, kiedy zegar ostatnio zadziałał.
+
 ## Przykłady poleceń
 - „Co nowego w zapytaniach?” / „Pokaż ostatnie zapytanie” / „Oznacz zapytanie od Marco jako przeczytane”
 - „Zmień hasło Villa Dea na: Dom nad morzem” → hasło + tłumaczenia na 6 języków

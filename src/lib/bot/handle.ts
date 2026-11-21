@@ -7,6 +7,11 @@ import { describe, execute, think, undo, visitsLine, type Action } from "./agent
 import { admins, answer, download, edit, esc, send, typing, type Button } from "./telegram";
 import { transcribe } from "./transcribe";
 import { workerLine } from "../worker";
+import { assistantButton, assistantLine, calendarHelp, describeAssistant, isAssistant, runAssistant } from "../assistant/actions";
+import { journal } from "../assistant/journal";
+import { buildReport } from "../assistant/report";
+import { tickLine } from "../assistant/tick";
+import { today } from "../assistant/time";
 
 /** The parts of a Telegram update we use. */
 export type Update = {
@@ -51,7 +56,15 @@ const HELP = `👋 <b>Cześć Claudio!</b> Pisz albo mów do mnie — w każdym 
 • „Ile osób było dziś na stronie?” / „Skąd są odwiedzający?”
 • „Odpowiedz Marco, że w piątek wyślę wycenę” — albo 💬 Odpowiedz pod zapytaniem (albo po prostu odpowiedz na powiadomienie, przesuwając je w lewo)
 • „Cofnij”
-Zanim cokolwiek zmienię albo wyślę, pokażę plan i poczekam na ✅. Nowe zapytania z formularza przychodzą tu same. /stats — szybkie liczby.`;
+Zanim cokolwiek zmienię albo wyślę, pokażę plan i poczekam na ✅. Nowe zapytania z formularza przychodzą tu same. /stats — szybkie liczby.
+
+🗓 <b>Jestem też Twoim asystentem</b> (to zapisuję od razu):
+• „Przypomnij mi jutro o 10 zadzwonić do Marco” / „za 20 minut wyjąć pizzę”
+• „W czwartek o 15 spotkanie z klientem w Olbii” → kalendarz + przypomnę godzinę i 15 min wcześniej
+• „Codziennie o 9 przypomnij mi sprawdzić maile” / „Co mam jutro?” / „Przesuń spotkanie na 16”
+• „Zanotuj: skończyłem layout hotelu” → trafi do wieczornego raportu
+• Codziennie o 20:00 raport dnia: kto był na stronie, co poprawić, pomysł na system, plan na jutro („raport o 21” zmienia godzinę)
+/raport — raport teraz · /kalendarz — jak mieć wszystko w kalendarzu w telefonie`;
 
 async function revalidate(origin?: string) {
   if (!origin) return;
@@ -71,6 +84,11 @@ export async function handleUpdate(u: Update, origin?: string) {
   try {
     if (m.text === "/start" || m.text === "/help" || /^(pomoc|help|aiuto|hilfe|ayuda|aide|\?)$/i.test(m.text?.trim() ?? "")) return void (await send(chat, HELP));
     if (m.text === "/status" || m.text === "/stats") return void (await send(chat, await status()));
+    if (m.text === "/kalendarz" || m.text === "/calendar") return void (await send(chat, calendarHelp()));
+    if (m.text === "/raport" || m.text === "/report") {
+      const r = await typing(chat, () => buildReport(today()));
+      return void (await send(chat, r.html, r.buttons));
+    }
     if (m.text === "/anuluj" || m.text === "/cancel") {
       await kv.del(`bot:replyto:${chat}`);
       return void (await send(chat, "OK, nic nie wysyłam."));
@@ -100,6 +118,19 @@ export async function handleUpdate(u: Update, origin?: string) {
     }
 
     const t = await typing(chat, () => think(text || "(zdjęcie bez podpisu)", chat, !!photo));
+    // reminders, calendar, notes: saved at once, each answers with its own message (🗑 / ↩️ inside)
+    const mine = t.actions.filter(isAssistant);
+    if (mine.length) {
+      for (const a of mine) {
+        try {
+          await runAssistant(a, chat);
+        } catch (e) {
+          await send(chat, `😕 ${esc(describeAssistant(a))}: ${esc((e as Error).message).slice(0, 300)}`);
+        }
+      }
+      t.actions = t.actions.filter((a) => !isAssistant(a));
+      if (!t.actions.length) return;
+    }
     if (!t.actions.length) return void (await send(chat, esc(t.reply)));
     if (t.actions.every((a) => a.type === "undo")) {
       await send(chat, await undo());
@@ -144,6 +175,7 @@ async function onButton(q: NonNullable<Update["callback_query"]>, origin?: strin
       if (msgId) await edit(chat, msgId, `${plan}\n\n⏳ Zapisuję…`);
       const extra = await typing(chat, () => execute(p.actions, { chatId: chat, origin, photo: p.photo }));
       await revalidate(origin);
+      for (const l of p.lines) await journal("bot", l);
       // recordings are only handed to the computer here: nothing changed yet, so nothing to undo
       const onlyJobs = p.actions.every((a) => a.type === "project_refresh" || a.type === "project_import");
       const one = p.actions.find((a): a is Extract<Action, { slug: string }> => "slug" in a);
@@ -206,6 +238,8 @@ async function onButton(q: NonNullable<Update["callback_query"]>, origin?: strin
       if (msgId && q.message?.text) await edit(chat, msgId, `${esc(q.message.text)}\n\n${status === "read" ? "✓ przeczytane" : status === "archived" ? "🗄 w archiwum" : "✓ odpowiedziane"}`, messageButtons(m, status));
       return;
     }
+    // reminders (✅ / ⏰ / 🗑 / ↩️) and the report's 💡
+    if (await assistantButton(kind, (q.data ?? "").split(":").slice(1), { id: q.id, chat, msgId, text: q.message?.text })) return;
     await answer(q.id);
   } catch (e) {
     await answer(q.id, "😕 Błąd");
@@ -221,6 +255,8 @@ Projekty: ${projects.length} (${projects.filter((p) => p.published).length} na s
 Zapytania: ${messages.length} · nowe: <b>${unread.length}</b>
 Dostępność: ${settings.available ? "✅ przyjmuję projekty" : "⛔ kalendarz pełny"}
 ${await workerLine().catch(() => "🖥 Komputer: brak danych")}
+${await assistantLine().catch(() => "🗓 Asystent: brak danych")}
+${await tickLine().catch(() => "")}
 
 ${await visitsPl()}`;
 }
@@ -293,6 +329,7 @@ export async function notifyMessage(m: Message, uploads: import("./telegram").Up
   ].filter((l, i, all) => l || (i > 0 && all[i - 1]));
   const { notifyAdmins, sendUploads, botEnabled } = await import("./telegram");
   await notifyAdmins(lines.join("\n"), messageButtons(m));
+  await journal("request", `✉️ Nowe zapytanie: ${m.name} (${m.services.join(", ")})`);
   // the photos as an album, PDFs as downloadable files, right under the request
   if (uploads.length && botEnabled())
     await Promise.all(admins().map((id) => sendUploads(id, uploads, `📎 ${m.name} · #${m.id.slice(0, 8)}`).catch((e) => console.error("[telegram] files", e))));

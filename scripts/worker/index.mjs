@@ -17,7 +17,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { announce, kv, projects, ready } from "./supa.mjs";
+import { announce, journal, kv, projects, ready } from "./supa.mjs";
 import { admins, edit, esc, send } from "./tg.mjs";
 import { resolveSource, samePlace } from "./source.mjs";
 import { probeFile, publishMedia, waitLive } from "./publish.mjs";
@@ -65,6 +65,25 @@ if (!ready()) {
 let busy = null;
 const beat = () =>
   DRY ? Promise.resolve() : kv.set("worker:alive", { at: Date.now(), host: os.hostname(), busy, pid: process.pid }).catch((e) => log("heartbeat:", e.message));
+
+/* ── the assistant's clock ───────────────────────────────────────────────── */
+// Every minute while the computer is on: the site sends reminders that are due (and waits for those
+// due within the next ~minute), the morning plan and the evening report. src/lib/assistant/tick.ts
+const TICK = 60_000;
+let tickFails = 0;
+const knock = () =>
+  fetch(`${SITE}/api/cron/tick?by=worker&ahead=65`, {
+    method: "POST",
+    headers: { "x-tick-secret": process.env.TELEGRAM_WEBHOOK_SECRET ?? "" },
+    signal: AbortSignal.timeout(30_000),
+  })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      tickFails = 0;
+    })
+    .catch((e) => {
+      if (++tickFails === 5 || tickFails % 60 === 0) log("zegar asystenta:", e.message);
+    });
 
 /* ── queue ───────────────────────────────────────────────────────────────── */
 
@@ -363,6 +382,7 @@ async function work(q) {
       .join("\n");
     const buttons = [[{ text: "🌐 Zobacz", url: `${SITE}/pl/work/${project.slug}` }, ...(before && texts && !DRY ? [{ text: "↩️ Cofnij opisy", data: "undo:" }] : [])]];
     await show(tail, buttons, true);
+    if (!DRY) await journal("worker", before ? `📸 ${project.name}: nowe zrzuty i wideo${texts ? " + nowe opisy" : ""}` : `➕ Nowy projekt: ${project.name}`);
     await save({ status: "done", finishedAt: new Date().toISOString(), slug: project.slug, projectId: project.id });
     log(`✔ ${key}: ${project.slug}${pub.pushed ? " (wysłane)" : ""}`);
   } catch (e) {
@@ -391,6 +411,8 @@ if (DRY) {
 await recover().catch((e) => log("start:", e.message));
 await beat();
 setInterval(beat, BEAT);
+void knock();
+setInterval(knock, TICK);
 for (;;) {
   let next = null;
   try {

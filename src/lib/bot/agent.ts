@@ -8,6 +8,11 @@ import { locales, type Locale } from "../i18n";
 import { launchImport } from "../importer";
 import { queueWork, viaWorker } from "../worker";
 import { categories, statuses, type Message, type Project, type Settings } from "../types";
+import { AssistantActions, describeAssistant } from "../assistant/actions";
+import { dayLog } from "../assistant/journal";
+import { agendaForAi } from "../assistant/reminders";
+import { assistantCfg } from "../assistant/report";
+import { dateTable, today } from "../assistant/time";
 
 /* ─── actions the AI may propose (validated; applied only after ✅) ─────────── */
 
@@ -73,6 +78,8 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("message_status"), id: z.string().min(4), status: z.enum(["new", "read", "replied", "archived"]) }),
   z.object({ type: z.literal("message_reply"), id: z.string().min(4), text: z.string().min(2).max(4000) }),
   z.object({ type: z.literal("undo") }),
+  // personal assistant: reminders, calendar, notes, report times (applied at once — assistant/actions.ts)
+  ...AssistantActions,
 ]);
 export type Action = z.infer<typeof ActionSchema>;
 
@@ -91,7 +98,20 @@ Top countries (30d): ${s.countries.map((c) => `${c.country} ${c.views}`).join(",
 }
 
 async function context() {
-  const [projects, settings, messages, visits] = await Promise.all([db.projects({ all: true }), db.settings(), db.messages(), visitsLine()]);
+  const [projects, settings, messages, visits, agenda, cfg, log] = await Promise.all([
+    db.projects({ all: true }),
+    db.settings(),
+    db.messages(),
+    visitsLine(),
+    agendaForAi().catch(() => "AGENDA: (unavailable)"),
+    assistantCfg(),
+    dayLog(today()),
+  ]);
+  const assistant = `ASSISTANT: evening report ${cfg.report || "off"} · morning plan ${cfg.morning || "off"} (Italian time)
+DATES (Italian time — read weekdays from here):
+${dateTable()}
+${agenda}
+TODAY'S LOG: ${log.map((e) => e.text).slice(-12).join(" | ") || "-"}`;
   const P = projects.map(
     (p) =>
       `${p.order}. ${p.slug} | ${p.name} | ${p.category} | ${p.year} | ${p.status}${p.url ? ` ${p.url}` : ""}${p.source && !/^https?:/.test(p.source) ? ` | folder ${p.source}` : ""} | ${p.published ? "published" : "DRAFT"}${p.featured ? " ★" : ""}${p.locked ? " 🔒" : ""} | tagline: ${short(p.tagline.pl || p.tagline.en, 90)} | stack: ${p.stack.join(", ")}`,
@@ -103,8 +123,10 @@ async function context() {
   const compact = `PROJECTS (slug | name | visibility): ${projects.map((p) => `${p.slug}|${p.name}|${p.published ? "on" : "draft"}${p.featured ? "★" : ""}${p.source && !/^https?:/.test(p.source) ? `|${p.source}` : ""}`).join("; ")}
 REQUESTS (${messages.filter((m) => m.status === "new").length} unread): ${messages.slice(0, 4).map((m) => `${m.id.slice(0, 8)}|${m.status}|${m.name}|${m.services.join("+")}|${m.budget}`).join("; ") || "none"}
 SETTINGS: available ${settings.available}, email ${settings.email}
-${visits}`;
-  return { projects, messages, settings, compact, text: `PROJECTS (order. slug | name | category | year | status | visibility | …):\n${P.join("\n")}\n\nSETTINGS: ${S}\n\nCONTACT REQUESTS (newest first, ${messages.filter((m) => m.status === "new").length} unread; id = first 8 chars):\n${M.join("\n") || "(none)"}\n\n${visits}` };
+${visits}
+DATES: ${dateTable(8).split("\n").map((l) => l.split(" (")[0]).join("; ")}
+${agenda.split("\n").slice(0, 9).join("\n")}`;
+  return { projects, messages, settings, compact, text: `PROJECTS (order. slug | name | category | year | status | visibility | …):\n${P.join("\n")}\n\nSETTINGS: ${S}\n\nCONTACT REQUESTS (newest first, ${messages.filter((m) => m.status === "new").length} unread; id = first 8 chars):\n${M.join("\n") || "(none)"}\n\n${visits}\n\n${assistant}` };
 }
 
 function system(data: string, photo: boolean) {
@@ -134,6 +156,23 @@ Action formats:
 {"type":"undo"}  (revert the last change)
 Example — he says "Zmień hasło Villa Dea na: Dom nad morzem" → {"reply":"Zmienić hasło Villa Dea na „Dom nad morzem”?","actions":[{"type":"project_text","slug":"villa-dea","field":"tagline","text":"Dom nad morzem","lang":"pl"}]}
 When the request is clear, ALWAYS include the action — the confirmation buttons are added automatically, never ask "do you want…" without actions.
+
+YOU ARE ALSO HIS PERSONAL ASSISTANT. These actions are applied AT ONCE (no ✅; the system answers with the exact date and buttons, so "reply" may be ""). Never say you saved/will remind without the action:
+{"type":"reminder_add","text":"…","kind":"reminder|event","date"?:"YYYY-MM-DD","time"?:"HH:MM","in_minutes"?:N,"place"?:"…","before"?:[minutes],"repeat"?:"daily|weekdays|weekly|monthly|yearly","duration"?:minutes}
+  · "przypomnij mi / nie daj mi zapomnieć / remind me / ricordami" → kind "reminder" (message at that time, with ✅ and snooze buttons).
+  · A meeting, call, appointment, visit, trip, delivery, deadline → kind "event" (goes to his calendar; message 60 and 15 min before by default; "przypomnij dzień wcześniej" → before [1440]; "godzinę wcześniej" → before [60]). Birthdays/whole-day things → event without time.
+  · Dates: copy them from DATES (never compute weekdays yourself). "jutro" = tomorrow, "w piątek" = the next Friday in DATES, "za tydzień" = today + 7 days. No day said → omit date (= today, or tomorrow if that hour has passed). "za 20 minut / za 2 godziny" → in_minutes only. 24-hour times: "o 3 po południu" = 15:00, "rano" = 09:00, "wieczorem" = 19:00. No hour → omit time.
+  · A plan said as a plain fact with a day ("w piątek urodziny mamy", "jutro o 9 dentysta", "w sobotę wesele w Cagliari") → event right away; never ask when to remind — the defaults are good and he can change them.
+  · "text" = the thing itself in his words and language, without the date, keeping who/what ("Urodziny mamy", "Zadzwonić do Marco", "Spotkanie z klientem — hotel"). Several things → several actions.
+{"type":"reminder_change","id":"…","date"?,"time"?,"text"?,"place"?}  (id from AGENDA; "przesuń spotkanie z Marco na 16". Never ask him for an id — find the item in AGENDA by its words; not there → say you don't see it in the calendar.)
+{"type":"reminder_remove","id":"…"}  ("usuń / odwołaj / skasuj przypomnienie")
+{"type":"reminder_done","id":"…"}  ("zrobiłem / załatwione")
+{"type":"note","text":"…"}  ("zanotuj…", "dziś zrobiłem…", "zapisz, że…" → tonight's report)
+{"type":"assistant_settings","report"?:"HH:MM" or "" (off),"morning"?:"HH:MM" or "" (off)}  ("raport wysyłaj o 21", "wyłącz poranny plan")
+{"type":"report_now"}  ("pokaż raport", "jak minął dzień?", "podsumuj dzień")
+{"type":"calendar_link"}  ("jak to mieć w kalendarzu w telefonie?")
+Questions about his plans ("co mam jutro?", "kiedy spotkanie z Marco?") → answer from AGENDA in "reply" (day + hour), no action.
+Example — "jutro o 10 spotkanie z Marco w Olbii, przypomnij mi godzinę wcześniej" → {"reply":"","actions":[{"type":"reminder_add","kind":"event","text":"Spotkanie z Marco","date":"<tomorrow from DATES>","time":"10:00","place":"Olbia","before":[60]}]}
 ${STYLE}
 
 ${data}`;
@@ -143,7 +182,7 @@ ${data}`;
 function systemCompact(data: string, photo: boolean) {
   return `Assistant of Claudio Taras' portfolio site. He writes/speaks any language. Reply ONLY JSON {"reply":"…","actions":[…]}.
 Questions: answer in reply from DATA, actions []. Changes: actions (he confirms later); reply = 1 short sentence asking to confirm. Unclear: ask, no actions. Reply in his language, short, plain text.
-Actions: project_update{slug,set:{name,client,year,location,category,status:live|local|private|wip (wip=in progress; "skończyłem X"→live if url else local),url,accent,stack[],published,featured,locked}} · project_text{slug,field:tagline|summary|challenge|solution|role,text,lang} · project_features{slug,features[],lang} · project_result{slug,value,label,lang} · project_move{slug,position} · project_rewrite{slug,note} · project_refresh{slug,texts:true if the site changed/is different,source if he names a folder like F:\\\\hotel ("F hotel") or link} · project_import{source,publish} (new project from a link/folder) · ${photo ? "project_photo{slug} · portrait{} · " : ""}settings{set:{available,email,phone,location,yearsExperience}} · bio{text,lang} · message_status{id,status:new|read|replied|archived} · message_reply{id,text in the client's language} · undo{}. Traffic questions → VISITS line. Every action has "type". "tagline" = hasło/slogan, "summary" = opis.
+Actions: project_update{slug,set:{name,client,year,location,category,status:live|local|private|wip (wip=in progress; "skończyłem X"→live if url else local),url,accent,stack[],published,featured,locked}} · project_text{slug,field:tagline|summary|challenge|solution|role,text,lang} · project_features{slug,features[],lang} · project_result{slug,value,label,lang} · project_move{slug,position} · project_rewrite{slug,note} · project_refresh{slug,texts:true if the site changed/is different,source if he names a folder like F:\\\\hotel ("F hotel") or link} · project_import{source,publish} (new project from a link/folder) · ${photo ? "project_photo{slug} · portrait{} · " : ""}settings{set:{available,email,phone,location,yearsExperience}} · bio{text,lang} · message_status{id,status:new|read|replied|archived} · message_reply{id,text in the client's language} · undo{}. Personal assistant (applied at once, reply ""): reminder_add{text,kind:reminder|event (meetings),date from DATES,time HH:MM,in_minutes ("za 20 minut"),place,before[min],repeat:daily|weekdays|weekly|monthly|yearly} · reminder_change{id,date,time,text} · reminder_remove{id} · reminder_done{id} · note{text} · assistant_settings{report:"HH:MM"|"",morning} · report_now{} · calendar_link{}. "co mam jutro" → answer from AGENDA. Traffic questions → VISITS line. Every action has "type". "tagline" = hasło/slogan, "summary" = opis.
 Example — he says "Zmień hasło Villa Dea na: Dom nad morzem" → {"reply":"Zmienić hasło Villa Dea na „Dom nad morzem”?","actions":[{"type":"project_text","slug":"villa-dea","field":"tagline","text":"Dom nad morzem","lang":"pl"}]}
 When the request is clear, ALWAYS include the action — the confirmation buttons are added automatically, never ask "do you want…" without actions.
 DATA:
@@ -234,6 +273,8 @@ export function describe(a: Action, projects: Project[]): string {
 „${short(a.text, 900)}”`;
     case "undo":
       return "↩️ Cofnij ostatnią zmianę";
+    default:
+      return describeAssistant(a);
   }
 }
 

@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { handleUpdate, type Update } from "@/lib/bot/handle";
+import { tick } from "@/lib/assistant/tick";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,8 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error("[telegram] update", update.update_id, e);
     }
+    // every message is also a knock on the assistant's clock (reminders, report) — see lib/assistant/tick.ts
+    await tick(0, "telegram").catch((e) => console.error("[telegram] tick", e));
   });
   return new Response("ok");
 }

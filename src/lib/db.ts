@@ -301,14 +301,11 @@ export const kv = {
       await sb("kv", { method: "POST", body: JSON.stringify({ id: key, data }) });
       return;
     }
-    const all = await kvFile();
-    all[key] = { data, at: Date.now() };
-    // keep it small: drop entries older than 7 days
-    for (const [k, v] of Object.entries(all)) if (Date.now() - v.at > 7 * 86400_000) delete all[k];
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    const tmp = `${KV_FILE}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(all), "utf8");
-    await fs.rename(tmp, KV_FILE);
+    await kvMutate((all) => {
+      all[key] = { data, at: Date.now() };
+      // keep it small: drop entries older than 7 days (not the calendar, the day logs or the assistant's settings)
+      for (const [k, v] of Object.entries(all)) if (!KEEP.test(k) && Date.now() - v.at > 7 * 86400_000) delete all[k];
+    });
   },
   /** Every entry whose key starts with `prefix` (e.g. the computer's jobs, "job:"). */
   async list<T>(prefix: string): Promise<{ id: string; data: T }[]> {
@@ -322,11 +319,59 @@ export const kv = {
       await sb(`kv?id=eq.${encodeURIComponent(key)}`, { method: "DELETE" });
       return;
     }
-    const all = await kvFile();
-    delete all[key];
-    await fs.writeFile(KV_FILE, JSON.stringify(all), "utf8");
+    await kvMutate((all) => {
+      delete all[key];
+    });
+  },
+  /**
+   * Take `key` once: true for exactly one caller, false for everyone after (or at the same moment).
+   * Several clocks wake the assistant (the computer, GitHub, Vercel) — this keeps every reminder and
+   * report to a single message.
+   */
+  async once(key: string): Promise<boolean> {
+    if (usingSupabase) {
+      const rows = await sb<Row<unknown>[]>("kv", {
+        method: "POST",
+        headers: { Prefer: "return=representation,resolution=ignore-duplicates" },
+        body: JSON.stringify({ id: key, data: { at: new Date().toISOString() } }),
+      });
+      return rows.length > 0;
+    }
+    let won = false;
+    await kvMutate((all) => {
+      if (all[key]) return;
+      all[key] = { data: { at: new Date().toISOString() }, at: Date.now() };
+      won = true;
+    });
+    return won;
+  },
+  /** Delete every `prefix…` key that sorts before `before` (dated keys: "day:2026-09-01" < "day:2026-10-01"). */
+  async prune(prefix: string, before: string) {
+    if (usingSupabase) {
+      await sb(`kv?id=like.${encodeURIComponent(prefix)}*&id=lt.${encodeURIComponent(before)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return;
+    }
+    await kvMutate((all) => {
+      for (const k of Object.keys(all)) if (k.startsWith(prefix) && k < before) delete all[k];
+    });
   },
 };
+const KEEP = /^(rem:|day:|bot:assistant|bot:ideas)/;
+
+/** file store: one read-modify-write at a time (parallel reminders used to overwrite each other) */
+let kvWriting: Promise<void> = Promise.resolve();
+function kvMutate(fn: (all: Record<string, { data: unknown; at: number }>) => void) {
+  const run = kvWriting.then(async () => {
+    const all = await kvFile();
+    fn(all);
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const tmp = `${KV_FILE}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(all), "utf8");
+    await fs.rename(tmp, KV_FILE);
+  });
+  kvWriting = run.catch(() => {});
+  return run;
+}
 
 /* ---------------------------------- analytics ---------------------------------- */
 // Anonymous page views. File store: .data/views.json (last 50 000) · Supabase: table `page_views`.
@@ -365,6 +410,19 @@ export const analytics = {
       await fs.rename(tmp, VIEWS_FILE);
     });
     return viewsWrite;
+  },
+
+  /** Raw views between two instants (the evening report counts an Italian day, not a UTC one). */
+  async range(from: Date, to: Date): Promise<PageView[]> {
+    if (usingSupabase)
+      return sb<PageView[]>(`page_views?select=at,path,locale,country,device,referrer,visitor&at=gte.${from.toISOString()}&at=lt.${to.toISOString()}&order=at.asc&limit=50000`);
+    try {
+      const a = from.toISOString();
+      const b = to.toISOString();
+      return (JSON.parse(await fs.readFile(VIEWS_FILE, "utf8")) as PageView[]).filter((v) => v.at >= a && v.at < b);
+    } catch {
+      return [];
+    }
   },
 
   async stats(days = 30): Promise<ViewStats> {

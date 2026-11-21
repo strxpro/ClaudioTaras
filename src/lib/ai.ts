@@ -19,7 +19,8 @@ export type ChatMsg = { role: "system" | "user" | "assistant"; content: string }
 type Slot = { name: string; url: string; key?: string; model: string };
 
 const COMPAT: { name: string; url: string; env?: string; models: string[] }[] = [
-  { name: "groq", url: "https://api.groq.com/openai/v1", env: "GROQ_API_KEY", models: [process.env.GROQ_MODEL || "openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
+  // each Groq model has its own free 8k tokens/minute: three of them before the keyless fallback
+  { name: "groq", url: "https://api.groq.com/openai/v1", env: "GROQ_API_KEY", models: [process.env.GROQ_MODEL || "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"] },
   { name: "cerebras", url: "https://api.cerebras.ai/v1", env: "CEREBRAS_API_KEY", models: ["gpt-oss-120b", "qwen-3-235b-a22b-instruct-2507"] },
   { name: "gemini", url: "https://generativelanguage.googleapis.com/v1beta/openai", env: "GEMINI_API_KEY", models: [process.env.GEMINI_MODEL || "gemini-3.5-flash-lite", "gemini-flash-latest"] },
   { name: "openrouter", url: "https://openrouter.ai/api/v1", env: "OPENROUTER_API_KEY", models: ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-31b-it:free"] },
