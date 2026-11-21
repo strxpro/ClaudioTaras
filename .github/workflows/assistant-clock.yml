@@ -1,0 +1,18 @@
+# The Telegram assistant's clock when Claudio's computer is off: every ~5 minutes it knocks on the
+# site, which sends the reminders that are due (and waits for the ones due in the next 5 minutes),
+# the morning plan and the evening report. Knocking twice never sends twice (src/lib/assistant/tick.ts).
+name: assistant-clock
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  knock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl -fsS -m 60 -X POST "https://www.claudiotaras.com/api/cron/tick?by=github&ahead=280" || true
