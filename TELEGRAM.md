@@ -51,7 +51,25 @@ npm run bot:webhook
 ```
 
 Uwaga: `npm run bot:dev` odłącza webhook (bot słucha wtedy Twojego komputera) — po testach uruchom znowu `npm run bot:webhook`.
-Import nowych projektów (zrzuty, wideo) działa tylko na Twoim komputerze — na Vercelu nie ma przeglądarki do nagrywania.
+
+## 5. Pomocnik na komputerze (nowe zrzuty, nowe projekty z folderów)
+Bot działa na Vercelu: tam nie ma przeglądarki do nagrywania i nie widać Twojego dysku F:. Dlatego nagrania robi **pomocnik** na Twoim komputerze:
+
+1. Mówisz botowi np. „Strona Villa Dea się zmieniła”, „W F hotel jest nowa wersja” albo „Dodaj projekt z folderu F:\Projekty\sklep” → bot pokazuje plan → ✅.
+2. Bot zapisuje zlecenie w Supabase. Pomocnik sprawdza je co 10 sekund i bierze się do pracy: otwiera stronę albo sam uruchamia projekt z folderu, nagrywa wideo, zrzuty sekcji (komputer + telefon), logo, klipy, a gdy strona się zmieniła — pisze nowe opisy w 6 językach.
+3. Wysyła **tylko zdjęcia tego projektu** na GitHub (`git push`) → Vercel publikuje → pomocnik czeka, aż nowe zdjęcia będą na stronie, i dopiero wtedy zapisuje projekt (otwarte strony odświeżają się same).
+4. Przez cały czas jedna wiadomość na Telegramie pokazuje postęp ✅ ⏳, na końcu przyciski **🌐 Zobacz** i **↩️ Cofnij opisy**.
+
+Uruchomienie (raz):
+
+```bash
+npm run worker:install
+```
+
+Od tej chwili pomocnik startuje sam z Windows, bez okna. Wyłączenie: `npm run worker:remove`. Bez autostartu: `npm run worker` w terminalu (Ctrl+C kończy). Log: `.data/worker.log`.
+Gdy komputer jest wyłączony, bot przyjmie zlecenie i powie, że zacznie po włączeniu. `/stats` pokazuje, czy pomocnik działa i ile czeka w kolejce.
+
+Bezpieczniki: pomocnik nie wypycha nic poza folderem zdjęć danego projektu. Gdy na komputerze leżą inne niewysłane zmiany kodu albo GitHub ma nowsze zmiany, zostawia zdjęcia w commicie na komputerze i pisze, co zrobić. Nowy projekt, którego zdjęć jeszcze nie ma na stronie, zapisuje jako szkic.
 
 ## Przykłady poleceń
 - „Co nowego w zapytaniach?” / „Pokaż ostatnie zapytanie” / „Oznacz zapytanie od Marco jako przeczytane”
@@ -61,6 +79,10 @@ Import nowych projektów (zrzuty, wideo) działa tylko na Twoim komputerze — n
 - „Dodaj do Il Girasole liczbę 4,8 — ocena Google”
 - „Przesuń Lumo na pierwsze miejsce” / „Wyróżnij SpabiNext” / „Ukryj Grindi Group”
 - „Nie przyjmuję teraz projektów” / „Zmień telefon na …” / „Zmień moje bio na …”
-- „Dodaj projekt https://nowastrona.it” / „Dodaj projekt z F:\Projekty\nowy” / „Odśwież zrzuty Pizzerii”
+- „Strona Villa Dea się zmieniła” → nowe zrzuty, wideo i opisy (robi pomocnik na komputerze)
+- „W F hotel jest nowa wersja hotelu” → nagranie z folderu F:\hotel, nowe zdjęcia i opisy
+- „Odśwież zrzuty Pizzerii” → same zdjęcia, opisy zostają
+- „Pizzeria jest w F:\Pizzeria, odśwież ją” → zapamięta folder na przyszłość
+- „Dodaj projekt https://nowastrona.it” / „Dodaj projekt z F:\Projekty\nowy”
 - Zdjęcie z podpisem „do galerii Onda” albo „to moje zdjęcie” (portret w sekcji O mnie)
 - „Cofnij”

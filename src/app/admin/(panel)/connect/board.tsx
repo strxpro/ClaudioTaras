@@ -100,9 +100,20 @@ const GUIDES: Record<Check["id"], Guide> = {
     ],
     links: [{ href: "https://vercel.com/new", label: "Vercel" }],
   },
+  worker: {
+    steps: [
+      <>
+        Na swoim komputerze, w folderze portfolio, uruchom raz <C>npm run worker:install</C>. Pomocnik będzie startował sam z Windows, bez okna (wyłączenie: <C>npm run worker:remove</C>).
+      </>,
+      <>
+        Potem mówisz botowi np. „Strona Villa Dea się zmieniła” albo „W F:\hotel jest nowa wersja”: pomocnik nagra zrzuty i wideo, wyśle je na stronę (git push → Vercel) i napisze na Telegramie, jak idzie.
+      </>,
+    ],
+    links: [],
+  },
 };
 
-const ORDER: Check["id"][] = ["db", "telegram", "ai", "voice", "email", "site"];
+const ORDER: Check["id"][] = ["db", "telegram", "ai", "voice", "email", "worker", "site"];
 const DOT: Record<Level, string> = { ok: "bg-emerald-500", warn: "bg-amber-400", off: "bg-ink/20", error: "bg-[#ff5a36]" };
 const BADGE: Record<Level, string> = { ok: "Działa", warn: "Do dokończenia", off: "Nie podłączone", error: "Błąd" };
 

@@ -10,7 +10,7 @@ import { admins } from "./bot/telegram";
  */
 export type Level = "ok" | "warn" | "off" | "error";
 export type Check = {
-  id: "site" | "db" | "telegram" | "ai" | "voice" | "email";
+  id: "site" | "db" | "telegram" | "ai" | "voice" | "email" | "worker";
   level: Level;
   title: string;
   /** one line: what works or what is wrong */
@@ -174,8 +174,24 @@ async function email(): Promise<Check> {
   }
 }
 
+/** The worker on Claudio's computer (scripts/worker): new screenshots and projects from folders. */
+async function worker(): Promise<Check> {
+  const title = "Pomocnik na komputerze";
+  if (!usingSupabase) return { id: "worker", level: "off", title, summary: "Potrzebuje Supabase (przez nią dostaje zlecenia od bota)" };
+  try {
+    const { workerState, workQueue } = await import("./worker");
+    const [w, queue] = await Promise.all([workerState(), workQueue()]);
+    const seen = w.lastSeen ? new Date(w.lastSeen).toLocaleString("pl-PL", { timeZone: "Europe/Rome" }) : "";
+    const details = [queue.length ? `W kolejce: ${queue.length}` : "Kolejka pusta", ...(seen ? [`Ostatni sygnał: ${seen}`] : [])];
+    if (w.online) return { id: "worker", level: "ok", title, summary: w.busy ? `Pracuje: ${w.busy}` : "Włączony, czeka na zlecenia", details };
+    return { id: "worker", level: "warn", title, summary: seen ? "Wyłączony — zlecenia poczekają, aż włączysz komputer" : "Jeszcze nie uruchomiony", details };
+  } catch (e) {
+    return { id: "worker", level: "error", title, summary: "Nie udało się sprawdzić", details: [String(e).slice(0, 160)] };
+  }
+}
+
 export async function runChecks(): Promise<Check[]> {
-  return Promise.all([site(), database(), telegram(), ai(), voice(), email()]);
+  return Promise.all([site(), database(), telegram(), ai(), voice(), email(), worker()]);
 }
 
 export { isPublicHttps, siteUrl };

@@ -6,6 +6,7 @@ import { analytics, db, kv } from "../db";
 import { replyToClient } from "../replies";
 import { locales, type Locale } from "../i18n";
 import { launchImport } from "../importer";
+import { queueWork, viaWorker } from "../worker";
 import { categories, statuses, type Message, type Project, type Settings } from "../types";
 
 /* ─── actions the AI may propose (validated; applied only after ✅) ─────────── */
@@ -40,8 +41,15 @@ export const ActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project_results_clear"), slug }),
   z.object({ type: z.literal("project_move"), slug, position: z.coerce.number().int().min(1) }),
   z.object({ type: z.literal("project_rewrite"), slug, note: z.string().max(500).optional() }),
-  z.object({ type: z.literal("project_refresh"), slug }),
-  z.object({ type: z.literal("project_import"), source: z.string().min(3).max(400), publish: z.boolean().catch(true) }),
+  z.object({
+    type: z.literal("project_refresh"),
+    slug,
+    // where from, only when he names it ("w F hotel jest nowa wersja"); else the project's own site / folder
+    source: z.string().max(400).optional().catch(undefined),
+    // the site changed / is different → new descriptions in 6 languages as well
+    texts: z.boolean().optional().catch(undefined),
+  }),
+  z.object({ type: z.literal("project_import"), source: z.string().min(1).max(400), publish: z.boolean().catch(true) }),
   z.object({ type: z.literal("project_photo"), slug }),
   z.object({
     type: z.literal("settings"),
@@ -86,13 +94,13 @@ async function context() {
   const [projects, settings, messages, visits] = await Promise.all([db.projects({ all: true }), db.settings(), db.messages(), visitsLine()]);
   const P = projects.map(
     (p) =>
-      `${p.order}. ${p.slug} | ${p.name} | ${p.category} | ${p.year} | ${p.status}${p.url ? ` ${p.url}` : ""} | ${p.published ? "published" : "DRAFT"}${p.featured ? " ★" : ""}${p.locked ? " 🔒" : ""} | tagline: ${short(p.tagline.pl || p.tagline.en, 90)} | stack: ${p.stack.join(", ")}`,
+      `${p.order}. ${p.slug} | ${p.name} | ${p.category} | ${p.year} | ${p.status}${p.url ? ` ${p.url}` : ""}${p.source && !/^https?:/.test(p.source) ? ` | folder ${p.source}` : ""} | ${p.published ? "published" : "DRAFT"}${p.featured ? " ★" : ""}${p.locked ? " 🔒" : ""} | tagline: ${short(p.tagline.pl || p.tagline.en, 90)} | stack: ${p.stack.join(", ")}`,
   );
   const M = messages.slice(0, 15).map(
     (m) => `${m.id.slice(0, 8)} | ${m.createdAt.slice(0, 16).replace("T", " ")} | ${m.status} | lang ${m.locale} | ${m.name} <${m.email}>${m.phone ? ` ${m.phone}` : ""} | ${m.services.join(", ")} | ${m.budget} | ${m.timeline} | "${short(m.message, 220)}"${m.attachments?.length ? ` | ${m.attachments.length} attachment(s)` : ""}${m.replies?.length ? ` | you replied ${m.replies.length}× (last: "${short(m.replies[m.replies.length - 1].text, 80)}")` : ""}`,
   );
   const S = `available for work: ${settings.available}${settings.busyUntil ? ` (busy until ${settings.busyUntil}${settings.busyNote ? `: ${settings.busyNote}` : ""})` : ""} · call slots ${(settings.callDays ?? [1, 2, 3, 4, 5]).join(",")} @ ${(settings.callHours ?? ["10:00", "12:00", "15:00", "17:00"]).join(" ")} · today ${new Date().toISOString().slice(0, 10)} · email ${settings.email} · phone ${settings.phone || "-"} · location ${settings.location} · years of experience ${settings.yearsExperience} · bio: ${short(settings.bio.pl || settings.bio.en, 160)}`;
-  const compact = `PROJECTS (slug | name | visibility): ${projects.map((p) => `${p.slug}|${p.name}|${p.published ? "on" : "draft"}${p.featured ? "★" : ""}`).join("; ")}
+  const compact = `PROJECTS (slug | name | visibility): ${projects.map((p) => `${p.slug}|${p.name}|${p.published ? "on" : "draft"}${p.featured ? "★" : ""}${p.source && !/^https?:/.test(p.source) ? `|${p.source}` : ""}`).join("; ")}
 REQUESTS (${messages.filter((m) => m.status === "new").length} unread): ${messages.slice(0, 4).map((m) => `${m.id.slice(0, 8)}|${m.status}|${m.name}|${m.services.join("+")}|${m.budget}`).join("; ") || "none"}
 SETTINGS: available ${settings.available}, email ${settings.email}
 ${visits}`;
@@ -116,8 +124,8 @@ Action formats:
 {"type":"project_results_clear","slug":"…"}
 {"type":"project_move","slug":"…","position":1}
 {"type":"project_rewrite","slug":"…","note":"…"}  (AI rewrites all texts of that project)
-{"type":"project_refresh","slug":"…"}  (re-record screenshots, videos and logo)
-{"type":"project_import","source":"https://… or F:\\\\folder","publish":true}  (add a new project automatically)
+{"type":"project_refresh","slug":"…","texts"?:true,"source"?:"https://… or F:\\\\folder"}  (his computer records the project again: screenshots, videos, logo, and puts them on the site. "texts":true when he says the site changed / is different / has a new version or new content → new descriptions in 6 languages too; only "odśwież zrzuty / zdjęcia" → no texts. "source" only when he names a folder or a link; match folders to the projects above ("folder …"). Voice transcripts lose ":" and "\\\\": "F hotel" = "F:\\\\hotel", "w pliku F, hotel" = "F:\\\\hotel".)
+{"type":"project_import","source":"https://… or F:\\\\folder","publish":true}  (a NEW project from a link or a folder on his computer. If that folder/link already is a project above → project_refresh with texts true instead.)
 {"type":"project_photo","slug":"…"} {"type":"portrait"}
 {"type":"settings","set":{"available"?:bool,"email"?,"phone"?,"location"?,"yearsExperience"?:number,"busyUntil"?:"YYYY-MM-DD" or "" (free again),"busyNote"?:"what he works on now (his words, short)","callDays"?:[1-7],"callHours"?:["10:00",…]}}  (e.g. "I'm busy until the 20th, I'm building a shop" → available false, busyUntil, busyNote; "I'm free again" → available true, busyUntil "", busyNote "")
 {"type":"bio","text":"…","lang":"…"}
@@ -135,7 +143,7 @@ ${data}`;
 function systemCompact(data: string, photo: boolean) {
   return `Assistant of Claudio Taras' portfolio site. He writes/speaks any language. Reply ONLY JSON {"reply":"…","actions":[…]}.
 Questions: answer in reply from DATA, actions []. Changes: actions (he confirms later); reply = 1 short sentence asking to confirm. Unclear: ask, no actions. Reply in his language, short, plain text.
-Actions: project_update{slug,set:{name,client,year,location,category,status:live|local|private|wip (wip=in progress; "skończyłem X"→live if url else local),url,accent,stack[],published,featured,locked}} · project_text{slug,field:tagline|summary|challenge|solution|role,text,lang} · project_features{slug,features[],lang} · project_result{slug,value,label,lang} · project_move{slug,position} · project_rewrite{slug,note} · project_refresh{slug} · project_import{source,publish} · ${photo ? "project_photo{slug} · portrait{} · " : ""}settings{set:{available,email,phone,location,yearsExperience}} · bio{text,lang} · message_status{id,status:new|read|replied|archived} · message_reply{id,text in the client's language} · undo{}. Traffic questions → VISITS line. Every action has "type". "tagline" = hasło/slogan, "summary" = opis.
+Actions: project_update{slug,set:{name,client,year,location,category,status:live|local|private|wip (wip=in progress; "skończyłem X"→live if url else local),url,accent,stack[],published,featured,locked}} · project_text{slug,field:tagline|summary|challenge|solution|role,text,lang} · project_features{slug,features[],lang} · project_result{slug,value,label,lang} · project_move{slug,position} · project_rewrite{slug,note} · project_refresh{slug,texts:true if the site changed/is different,source if he names a folder like F:\\\\hotel ("F hotel") or link} · project_import{source,publish} (new project from a link/folder) · ${photo ? "project_photo{slug} · portrait{} · " : ""}settings{set:{available,email,phone,location,yearsExperience}} · bio{text,lang} · message_status{id,status:new|read|replied|archived} · message_reply{id,text in the client's language} · undo{}. Traffic questions → VISITS line. Every action has "type". "tagline" = hasło/slogan, "summary" = opis.
 Example — he says "Zmień hasło Villa Dea na: Dom nad morzem" → {"reply":"Zmienić hasło Villa Dea na „Dom nad morzem”?","actions":[{"type":"project_text","slug":"villa-dea","field":"tagline","text":"Dom nad morzem","lang":"pl"}]}
 When the request is clear, ALWAYS include the action — the confirmation buttons are added automatically, never ask "do you want…" without actions.
 DATA:
@@ -208,9 +216,9 @@ export function describe(a: Action, projects: Project[]): string {
     case "project_rewrite":
       return `✨ ${name} · nowe teksty AI w 6 językach${a.note ? ` (${short(a.note, 80)})` : ""}`;
     case "project_refresh":
-      return `📸 ${name} · nagraj od nowa zrzuty, wideo i logo`;
+      return `📸 ${name} · nagraj od nowa zrzuty, wideo i logo${a.texts ? " + nowe opisy w 6 językach" : ""}${a.source ? ` — z: ${a.source}` : ""} (zrobi to Twój komputer)`;
     case "project_import":
-      return `➕ Nowy projekt z: ${a.source}${a.publish ? " (od razu na stronie)" : " (jako szkic)"}`;
+      return `➕ Nowy projekt z: ${a.source}${a.publish ? " (od razu na stronie)" : " (jako szkic)"} (zrobi to Twój komputer)`;
     case "project_photo":
       return `🖼️ ${name} · dodaj zdjęcie do galerii`;
     case "settings":
@@ -302,11 +310,19 @@ export async function execute(actions: Action[], opts: { chatId: number; origin?
       }
       case "project_refresh": {
         const p = bySlug(a.slug);
-        const r = await launchImport({ source: p.source || p.url || "", projectId: p.id, publish: p.published, deploy: false, notifyChat: opts.chatId, origin: opts.origin });
+        if (viaWorker()) {
+          done.push(await queueWork({ kind: "refresh", slug: p.slug, projectId: p.id, name: p.name, source: a.source, texts: a.texts, chatId: opts.chatId }));
+          break;
+        }
+        const r = await launchImport({ source: a.source || p.source || p.url || "", projectId: p.id, publish: p.published, deploy: false, notifyChat: opts.chatId, origin: opts.origin });
         done.push(r.error ? `⚠️ ${r.error}` : `📸 ${p.name}: nagrywam od nowa — dam znać, gdy skończę (kilka minut).`);
         break;
       }
       case "project_import": {
+        if (viaWorker()) {
+          done.push(await queueWork({ kind: "import", source: a.source, publish: a.publish, chatId: opts.chatId }));
+          break;
+        }
         const r = await launchImport({ source: a.source, publish: a.publish, deploy: false, notifyChat: opts.chatId, origin: opts.origin });
         done.push(r.error ? `⚠️ ${r.error}` : "➕ Import ruszył — napiszę, gdy projekt będzie gotowy (kilka minut).");
         break;

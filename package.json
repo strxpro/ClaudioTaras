@@ -15,7 +15,10 @@
     "setup": "node scripts/setup.mjs",
     "setup:telegram": "node scripts/setup.mjs telegram",
     "db:sql": "node scripts/supabase-sql.mjs",
-    "db:snapshot": "node scripts/snapshot.mjs"
+    "db:snapshot": "node scripts/snapshot.mjs",
+    "worker": "node scripts/worker/index.mjs",
+    "worker:install": "node scripts/worker/install.mjs",
+    "worker:remove": "node scripts/worker/install.mjs --remove"
   },
   "dependencies": {
     "gsap": "^3.15.0",

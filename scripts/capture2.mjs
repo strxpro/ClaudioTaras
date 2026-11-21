@@ -165,7 +165,9 @@ async function shots(kind) {
   const { page, browser, viewport, desktop } = s;
   const stops = await sectionStops(page, viewport.height);
   const prefix = desktop ? "d" : "m";
-  for (const f of fs.readdirSync(SHOTS)) if (f.startsWith(prefix)) fs.rmSync(path.join(SHOTS, f));
+  // files only: the shots/<locale>/ folders of lang-shots.mjs start with letters too ("de" is not a desktop shot)
+  const own = new RegExp(`^${prefix}\\d+\\.webp$`);
+  for (const f of fs.readdirSync(SHOTS)) if (own.test(f)) fs.rmSync(path.join(SHOTS, f));
   const tmp = path.join(TMP, `shot-${kind}.png`);
   fs.mkdirSync(TMP, { recursive: true });
   let cur = 0;

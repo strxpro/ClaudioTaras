@@ -6,6 +6,7 @@ import { findMessage, polishReply, replyToClient } from "../replies";
 import { describe, execute, think, undo, visitsLine, type Action } from "./agent";
 import { admins, answer, download, edit, esc, send, typing, type Button } from "./telegram";
 import { transcribe } from "./transcribe";
+import { workerLine } from "../worker";
 
 /** The parts of a Telegram update we use. */
 export type Update = {
@@ -43,7 +44,9 @@ const HELP = `👋 <b>Cześć Claudio!</b> Pisz albo mów do mnie — w każdym 
 • „Dodaj do Il Girasole liczbę 4,8 — ocena Google”
 • „Przesuń Lumo na pierwsze miejsce” / „Wyróżnij SpabiNext”
 • „Nie przyjmuję teraz projektów” → przełącza dostępność
-• „Dodaj projekt https://nowastrona.it” / „Odśwież zrzuty Pizzerii”
+• „Strona Villa Dea się zmieniła” → Twój komputer nagra nowe zrzuty i wideo, wstawi je na stronę i napisze nowe opisy
+• „W F:\\hotel jest nowa wersja hotelu” / „Odśwież zrzuty Pizzerii” (same zdjęcia, opisy zostają)
+• „Dodaj projekt z folderu F:\\Projekty\\nowy” / „Dodaj projekt https://nowastrona.it”
 • Zdjęcie z podpisem „do galerii Onda” albo „to moje zdjęcie”
 • „Ile osób było dziś na stronie?” / „Skąd są odwiedzający?”
 • „Odpowiedz Marco, że w piątek wyślę wycenę” — albo 💬 Odpowiedz pod zapytaniem (albo po prostu odpowiedz na powiadomienie, przesuwając je w lewo)
@@ -141,10 +144,13 @@ async function onButton(q: NonNullable<Update["callback_query"]>, origin?: strin
       if (msgId) await edit(chat, msgId, `${plan}\n\n⏳ Zapisuję…`);
       const extra = await typing(chat, () => execute(p.actions, { chatId: chat, origin, photo: p.photo }));
       await revalidate(origin);
+      // recordings are only handed to the computer here: nothing changed yet, so nothing to undo
+      const onlyJobs = p.actions.every((a) => a.type === "project_refresh" || a.type === "project_import");
       const one = p.actions.find((a): a is Extract<Action, { slug: string }> => "slug" in a);
       const link = one ? httpsLink(`/pl/work/${one.slug}`) : httpsLink("/pl");
-      const buttons: Button[][] = [[{ text: "↩️ Cofnij", data: "undo:" }, ...(link ? [{ text: "🌐 Zobacz", url: link }] : [])]];
-      if (msgId) await edit(chat, msgId, `${plan}\n\n✅ Gotowe! Strona jest zaktualizowana.${extra.length ? `\n${extra.map(esc).join("\n")}` : ""}`, buttons);
+      const buttons: Button[][] = onlyJobs ? [] : [[{ text: "↩️ Cofnij", data: "undo:" }, ...(link ? [{ text: "🌐 Zobacz", url: link }] : [])]];
+      const head = onlyJobs ? "✅ Przyjęte." : "✅ Gotowe! Strona jest zaktualizowana.";
+      if (msgId) await edit(chat, msgId, `${plan}\n\n${head}${extra.length ? `\n${extra.map(esc).join("\n")}` : ""}`, buttons);
       return;
     }
     if (kind === "rp") {
@@ -214,6 +220,7 @@ async function status() {
 Projekty: ${projects.length} (${projects.filter((p) => p.published).length} na stronie, ${projects.filter((p) => p.featured).length} wyróżnionych)
 Zapytania: ${messages.length} · nowe: <b>${unread.length}</b>
 Dostępność: ${settings.available ? "✅ przyjmuję projekty" : "⛔ kalendarz pełny"}
+${await workerLine().catch(() => "🖥 Komputer: brak danych")}
 
 ${await visitsPl()}`;
 }

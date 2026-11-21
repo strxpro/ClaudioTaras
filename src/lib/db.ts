@@ -310,6 +310,13 @@ export const kv = {
     await fs.writeFile(tmp, JSON.stringify(all), "utf8");
     await fs.rename(tmp, KV_FILE);
   },
+  /** Every entry whose key starts with `prefix` (e.g. the computer's jobs, "job:"). */
+  async list<T>(prefix: string): Promise<{ id: string; data: T }[]> {
+    if (usingSupabase) return sb<Row<T>[]>(`kv?select=id,data&id=like.${encodeURIComponent(prefix)}*`);
+    return Object.entries(await kvFile())
+      .filter(([k]) => k.startsWith(prefix))
+      .map(([id, v]) => ({ id, data: v.data as T }));
+  },
   async del(key: string) {
     if (usingSupabase) {
       await sb(`kv?id=eq.${encodeURIComponent(key)}`, { method: "DELETE" });
